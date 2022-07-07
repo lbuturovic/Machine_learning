@@ -1,0 +1,2 @@
+U fajlu myEnvironment nalazi se većina modela i varijabli za NeuralneMreze.rmd.
+U fajlu spaseneVarijableIModeli nalazi se većina modela i varijabli za Zadaca2.rmd.

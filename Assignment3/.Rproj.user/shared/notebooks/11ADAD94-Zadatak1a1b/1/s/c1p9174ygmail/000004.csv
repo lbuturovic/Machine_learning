@@ -1,0 +1,1 @@
+"0","plot(podaci[c(""TotalSpent"", ""Kidhome"")], col = model$cluster)"

@@ -1,0 +1,1500 @@
+---
+title: "Zadaca 2 - MU"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Studenti:
+
+    Vedad Beglerović, Vildana Beglerović, Lejla Buturović
+
+Nastavna grupa:
+
+    Grupa 1
+
+## Zadatak 1. (Izgradnja modela klasifikacije)
+
+Za rad na zadaći koristi se isti set podataka kao za zadaću 1. Timovi mogu da koriste originalno postavljeni skup podataka ili da koriste skup podataka koji je rezultat potpunih ili djelimičnih transformacija iz zadatka 1 zadaće 1.
+
+a)  Izgraditi predikcijske modele za problem klasifikacije koji je rješavan u sklopu zadaće 1:
+
+    • KNN model predikcije;
+
+    • naivni Bayesov model predikcije;
+
+    • model logističke regresije;
+
+    • SVM model klasifikacije;
+
+    • model klasifikacije koji koristi neuralne mreže.
+
+    Obavezno izvršiti sljedeće korake:
+
+    • Dokumentovati korake pripreme seta podataka za odgovarajući model predikcije.
+
+    • Dokumentovati proces izgradnje klasifikacijskih modela, njihovog treniranja i testiranja na isti način kako je opisano u zadaći 1.
+
+    • Evaluirati modele pomoću konfuzijske matrice (koristeći sljedeće metrike: tačnost, specifičnost, osjetljivost, kappa statistika, itd.) ROC krivu, i metode cross-validacije.
+
+    • Razmotriti utjecaj nebalansiranosti podataka na dobivene rezultate i eventualnu primjenu metoda za rad sa nebalansiranim setovima podataka.
+
+    • Izvršiti tuning hiperparametara kreiranih modela i korištenje ensamble metoda za poboljšanje tačnosti klasifikacije. Na osnovu ostvarenih rezultata odaberati najbolji predikcijski model i obrazložiti odabir.
+
+b)  Prethodno odabrani najbolji model testirati na testnom setu podataka na isti način kao u trećem zadatku zadaće 1. Dokumentovati rezultate testiranja i procjene performansi modela, kao i usporedbu između performansi postignutih u zadaći 1 i performansi za modele iz zadaće 2. Detaljno obrazložiti (sa stanovišta rada algoritma, matematičkih koncepata i podataka) zašto je neka metoda dala bolje, a neka gore rezultate za korišteni skup podataka. Tim koji ostvari najbolji rezultat na testnom setu podataka dobiti će maksimalni broj bodova za ovaj zadatak, a svi ostali timovi će biti rangirani u odnosu na rezultate najboljeg tima
+
+```{r}
+#save.image(file='spaseneVarijableIModeliNajboljiSVMRadial100.RData')
+#load('spaseneVarijableIModeli.RData')
+```
+
+```{r}
+podaci <- read.csv("podaciProcesirani.csv", fileEncoding = 'UTF-8')
+
+#faktorizacija kategorickih varijabli
+podaci$gender <- factor(podaci$gender)
+podaci$Dependents <- factor(podaci$Dependents)
+podaci$PhoneService <- factor(podaci$PhoneService)
+podaci$StreamingTV <- factor(podaci$StreamingTV)
+podaci$Contract <- factor(podaci$Contract)
+podaci$PaymentMethod <- factor(podaci$PaymentMethod)
+podaci$InternetService <- factor(podaci$InternetService)
+podaci$Churn <- factor(podaci$Churn)
+
+#podjela skupa podataka na trening i testni skup
+rows <- sample(nrow(podaci))
+podaci <- podaci[rows, ]
+end <- length(podaci$Churn)
+n <- as.integer(0.85 * end)
+podaci_train <- podaci[1 : n, ]
+podaci_test <- podaci[(n + 1) : end, ]
+
+```
+
+```{r}
+
+draw_confusion_matrix <- function(cm)
+{
+ columns <- colnames(cm$table)
+ rows <- rownames(cm$table)
+ layout(matrix(c(1,1,2)))
+ par(mar=c(2,2,2,2))
+ plot(c(100, 345), c(300, 450), type = "n", xlab="", ylab="", xaxt='n',
+yaxt='n')
+ title('CONFUSION MATRIX', cex.main=2)
+ rect(150, 430, 240, 370, col='#3F97D0')
+ text(195, 435, columns[1], cex=1.2)
+ rect(250, 430, 340, 370, col='#F7AD50')
+ text(295, 435, columns[2], cex=1.2)
+ text(125, 370, 'Predicted', cex=1.3, srt=90, font=2)
+ text(245, 450, 'Actual', cex=1.3, font=2)
+ rect(150, 305, 240, 365, col='#F7AD50')
+ rect(250, 305, 340, 365, col='#3F97D0')
+ text(140, 400, rows[1], cex=1.2, srt=90)
+ text(140, 335, rows[2], cex=1.2, srt=90)
+ res <- as.numeric(cm$table)
+ text(195, 400, res[1], cex=1.6, font=2, col='white')
+ text(195, 335, res[2], cex=1.6, font=2, col='white')
+ text(295, 400, res[3], cex=1.6, font=2, col='white')
+ text(295, 335, res[4], cex=1.6, font=2, col='white')
+ plot(c(100, 0), c(100, 0), type = "n", xlab="", ylab="", main =
+"DETAILS", xaxt='n', yaxt='n')
+ text(10, 85, names(cm$byClass[1]), cex=1.2, font=2)
+ text(10, 70, round(as.numeric(cm$byClass[1]), 3), cex=1.2)
+ text(30, 85, names(cm$byClass[2]), cex=1.2, font=2)
+ text(30, 70, round(as.numeric(cm$byClass[2]), 3), cex=1.2)
+ text(50, 85, names(cm$byClass[5]), cex=1.2, font=2)
+ text(50, 70, round(as.numeric(cm$byClass[5]), 3), cex=1.2)
+ text(70, 85, names(cm$byClass[6]), cex=1.2, font=2)
+ text(70, 70, round(as.numeric(cm$byClass[6]), 3), cex=1.2)
+ text(90, 85, names(cm$byClass[7]), cex=1.2, font=2)
+ text(90, 70, round(as.numeric(cm$byClass[7]), 3), cex=1.2)
+ text(30, 35, names(cm$overall[1]), cex=1.5, font=2)
+ text(30, 20, round(as.numeric(cm$overall[1]), 3), cex=1.4)
+ text(70, 35, names(cm$overall[2]), cex=1.5, font=2)
+ text(70, 20, round(as.numeric(cm$overall[2]), 3), cex=1.4)
+}
+
+
+```
+
+KNN model predikcije:
+
+```{r}
+podaci_KNN<-podaci
+
+#pretvaranje kategoričkih varijabli u numeričke
+podaci_KNN$gender <- as.numeric(podaci_KNN$gender)
+podaci_KNN$Dependents <- as.numeric(podaci_KNN$Dependents)
+podaci_KNN$PhoneService <- as.numeric(podaci_KNN$PhoneService)
+podaci_KNN$StreamingTV <- as.numeric(podaci_KNN$StreamingTV)
+podaci_KNN$InternetService <- as.numeric(podaci_KNN$InternetService)
+podaci_KNN$Contract <- as.numeric(podaci_KNN$Contract)
+podaci_KNN$PaymentMethod <- as.numeric(podaci_KNN$PaymentMethod)
+
+#podjela skupa podataka na trening i testni skup
+rows <- sample(nrow(podaci_KNN))
+podaci_KNN <- podaci_KNN[rows, ]
+end <- length(podaci_KNN$Churn)
+n <- as.integer(0.85 * end)
+podaci_train_KNN <- podaci_KNN[1 : n, ]
+podaci_test_KNN <- podaci_KNN[(n + 1) : end, ]
+
+
+#predikacija
+library(class)
+library(caret)
+predictions <- knn(train = subset(podaci_train_KNN, select = -c(Churn)), test = subset(podaci_test_KNN, select = -c(Churn)),
+ cl = podaci_train_KNN$Churn, k = 15)
+
+#konfuzijska matrica
+cm <- confusionMatrix(data = predictions, reference =podaci_test_KNN$Churn, positive = "Yes")
+draw_confusion_matrix(cm)
+
+#k-fold cross validacija
+kfold <- function(podaci, k)
+{
+   folds <- split(podaci, cut(sample(1 : nrow(podaci)), k))
+   acc <- rep(NA, length(folds))
+   kappa <- rep(NA, length(folds))
+  
+   for (i in 1:length(folds))
+   {
+     test <- subset(ldply(folds[i], data.frame), select = -c(.id))
+     train <- subset(ldply(folds[-i], data.frame), select = -c(.id))
+     
+     predictions <- knn(train = subset(train, select = -c(Churn)), test = subset(test, select = -c(Churn)),
+   cl = train$Churn, k = 15)
+     
+     cm <- confusionMatrix(data = predictions, reference =test$Churn, positive = "Yes")
+  cm
+     
+     acc[i] <- cm$overall[1]
+     kappa[i] <- cm$overall[2]
+   }
+   list <- list("acc" = acc, "kappa" = kappa)
+   return (list)
+}
+
+#ROC krive
+library(class)
+library(caret)
+library(pROC)
+
+#roc kriva
+library(pROC)
+roc_prediction <- as.numeric(predictions)
+roc <- roc(podaci_test_KNN$Churn, roc_prediction, percent = TRUE)
+plot(roc$specificities, roc$sensitivities, type="l", lwd = 2, col =
+"blue", xlim = c(100, 0), ylim = c(0, 100))
+abline(coef = c(100, -1), col = "gray60")
+
+library(plyr)
+list <- kfold(podaci_KNN, 10)
+acc <- list$acc
+kappa <- list$kappa
+cat("10-fold validacija\n")
+cat("Najveća tačnost:", max(acc), ", fold:", which.max(acc))
+cat(", najveća kappa:", max(kappa), ", fold:", which.max(kappa), "\n")
+cat("Najmanja tačnost:", min(acc), ", fold:", which.min(acc))
+cat(", najmanja kappa:", min(kappa), ", fold:", which.min(kappa), "\n")
+cat("Srednja tačnost:", sum(acc) / length(acc))
+cat(", srednja kappa:", sum(kappa) / length(kappa), "\n\n")
+list <- kfold(podaci_KNN, 5)
+acc <- list$acc
+kappa <- list$kappa
+cat("5-fold validacija\n")
+cat("Najveća tačnost:", max(acc), ", fold:", which.max(acc))
+cat(", najveća kappa:", max(kappa), ", fold:", which.max(kappa), "\n")
+cat("Najmanja tačnost:", min(acc), ", fold:", which.min(acc))
+cat(", najmanja kappa:", min(kappa), ", fold:", which.min(kappa), "\n")
+cat("Srednja tačnost:", sum(acc) / length(acc))
+cat(", srednja kappa:", sum(kappa) / length(kappa), "\n\n")
+
+#određivanje optimalne vrijednosti parametra k
+library(tune)
+library(e1071)
+tuning <- tune.knn(formula = Churn ~ .,
+ x = subset(podaci_KNN, select = -c(Churn)),
+ y = podaci_KNN$Churn,
+ k = c(3, 5, 7, 9, 11, 13, 15, 17, 19, 21,23, 25, 27, 29, 31,33))
+cat("Najbolja vrijednost k:", tuning$best.parameters$k, "\n")
+cat("Najveća tačnost:", 1.00 - tuning$best.performance)
+plot(tuning)
+```
+
+```{r}
+
+summary(podaci)
+
+#min-max normalizacija MonthlyCharges
+podaci_minmax_normalizacija <- podaci_KNN
+
+max <- max(podaci_minmax_normalizacija$MonthlyCharges)
+min <- min(podaci_minmax_normalizacija$MonthlyCharges)
+podaci_minmax_normalizacija <- mutate(podaci_minmax_normalizacija, MonthlyCharges = (MonthlyCharges - min) / (max -min))
+
+#min-max normalizacija tenure
+max <- max(podaci_minmax_normalizacija$tenure)
+min <- min(podaci_minmax_normalizacija$tenure)
+podaci_minmax_normalizacija <- mutate(podaci_minmax_normalizacija, tenure = (tenure - min) / (max -min))
+
+#decimalno skaliranje MonthlyCharges
+podaci_decimal_scale <- podaci_KNN
+
+max <- max(podaci_decimal_scale$MonthlyCharges)
+j <- 0
+while (10 ** j < max)
+ j = j + 1
+podaci_decimal_scale <- mutate(podaci_decimal_scale, MonthlyCharges = MonthlyCharges / 10 ** j)
+
+
+#decimalno skaliranje tenure
+max <- max(podaci_decimal_scale$tenure)
+j <- 0
+while (10 ** j < max)
+ j = j + 1
+podaci_decimal_scale <- mutate(podaci_decimal_scale, tenure = tenure / 10 ** j)
+```
+
+```{r}
+#balansiranje podataka
+broj_instanci_yes <- length(subset(podaci, Churn == 'Yes')$gender)
+broj_instanci_no <- length(subset(podaci, Churn == 'No')$gender)
+cat("Broj instanci koje imaju Yes vrijednost: ", broj_instanci_yes,"\n")
+cat("Broj instanci koje imaju No vrijednost: ", broj_instanci_no)
+
+library(ROSE)
+oversample_minmax_normalizacija <- ovun.sample(Churn ~ ., data = podaci_minmax_normalizacija, method = "over",
+N = 2660)$data
+
+oversample_decimal_scale <- ovun.sample(Churn ~ ., data = podaci_decimal_scale, method = "over",
+N = 2660)$data
+
+```
+
+```{r}
+#tuning hiperparametra k nakon min-max normalizacije i balansiranja podataka
+tuning <- tune.knn(formula = Churn ~ .,
+ x = subset(oversample_minmax_normalizacija, select = -c(Churn)),
+ y = oversample_minmax_normalizacija$Churn,
+ k = c(3, 5, 7, 9, 11, 13, 15, 17, 19, 21))
+cat("Nakon min-max normalizacije i balansiranja podataka: \n")
+cat("Najbolja vrijednost k:", tuning$best.parameters$k, "\n")
+cat("Najveća tačnost:", 1.00 - tuning$best.performance, "\n")
+plot(tuning)
+
+#tuning hiperparametra k nakon decimalnog skaliranja i balansiranja podataka
+tuning <- tune.knn(formula = Churn ~ .,
+ x = subset(oversample_decimal_scale, select = -c(Churn)),
+ y = oversample_decimal_scale$Churn,
+ k = c(3, 5, 7, 9, 11, 13, 15, 17, 19, 21))
+cat("\nNakon decimalnog skaliranja i balansiranja podataka:")
+cat("\nNajbolja vrijednost k:", tuning$best.parameters$k, "\n")
+cat("Najveća tačnost:", 1.00 - tuning$best.performance)
+plot(tuning)
+```
+
+```{r}
+#decimalno skaliranje MonthlyCharges za podaci_KNN
+max <- max(podaci_KNN$MonthlyCharges)
+j <- 0
+while (10 ** j < max)
+ j = j + 1
+podaci_KNN <- mutate(podaci_KNN, MonthlyCharges = MonthlyCharges / 10 ** j)
+
+
+#decimalno skaliranje tenure za podaci_KNN
+max <- max(podaci_KNN$tenure)
+j <- 0
+while (10 ** j < max)
+ j = j + 1
+podaci_KNN <- mutate(podaci_KNN, tenure = tenure / 10 ** j)
+
+#balansiranje podaci_KNN
+podaci_KNN <- ovun.sample(Churn ~ ., data = podaci_KNN, method = "over",
+N = 2660)$data
+
+
+```
+
+```{r}
+#podjela na trening i testni podskup
+rows <- sample(nrow(podaci_KNN))
+podaci_KNN <- podaci_KNN[rows, ]
+end <- length(podaci_KNN$Churn)
+n <- as.integer(0.85 * end)
+podaci_train_KNN <- podaci_KNN[1 : n, ]
+podaci_test_KNN <- podaci_KNN[(n + 1) : end, ]
+
+#k-fold unakrsna validacija
+list <- kfold(podaci_KNN, 10)
+acc <- list$acc
+kappa <- list$kappa
+cat("10-fold validacija\n")
+cat("Najveća tačnost:", max(acc), ", fold:", which.max(acc))
+cat(", najveća kappa:", max(kappa), ", fold:", which.max(kappa), "\n")
+cat("Najmanja tačnost:", min(acc), ", fold:", which.min(acc))
+cat(", najmanja kappa:", min(kappa), ", fold:", which.min(kappa), "\n")
+cat("Srednja tačnost:", sum(acc) / length(acc))
+cat(", srednja kappa:", sum(kappa) / length(kappa), "\n\n")
+list <- kfold(podaci_KNN, 5)
+acc <- list$acc
+kappa <- list$kappa
+cat("5-fold validacija\n")
+cat("Najveća tačnost:", max(acc), ", fold:", which.max(acc))
+cat(", najveća kappa:", max(kappa), ", fold:", which.max(kappa), "\n")
+cat("Najmanja tačnost:", min(acc), ", fold:", which.min(acc))
+cat(", najmanja kappa:", min(kappa), ", fold:", which.min(kappa), "\n")
+cat("Srednja tačnost:", sum(acc) / length(acc))
+cat(", srednja kappa:", sum(kappa) / length(kappa), "\n\n")
+```
+
+```{r}
+#podjela na trening i testni podskup
+rows <- sample(nrow(podaci_KNN))
+podaci_KNN <- podaci_KNN[rows, ]
+end <- length(podaci_KNN$Churn)
+n <- as.integer(0.85 * end)
+podaci_train_KNN <- podaci_KNN[1 : n, ]
+podaci_test_KNN <- podaci_KNN[(n + 1) : end, ]
+
+#primjena različitih metrika distance
+library(kknn)
+
+kknn_manhattan <- kknn(formula = Churn ~ ., train = podaci_train_KNN, test =
+podaci_test_KNN, k = 3, distance = 1)
+
+kknn_euclidean <- kknn(formula = Churn ~ ., train = podaci_train_KNN, test =
+podaci_test_KNN, k = 3, distance = 2)
+
+kknn_minkowski_3 <- kknn(formula = Churn ~ ., train = podaci_train_KNN, test =
+podaci_test_KNN, k = 3, distance = 3)
+
+cm <- confusionMatrix(data = kknn_manhattan$fitted.values, reference =
+podaci_test_KNN$Churn, positive = "Yes")
+cat("Tačnost pri korištenju manhattan distance:", cm$overall[1], "\n")
+draw_confusion_matrix(cm)
+
+cm <- confusionMatrix(data = kknn_euclidean$fitted.values, reference =
+podaci_test_KNN$Churn, positive = "Yes")
+cat("Tačnost pri korištenju euklidske distance:", cm$overall[1], "\n")
+draw_confusion_matrix(cm)
+
+cm <- confusionMatrix(data = kknn_minkowski_3$fitted.values, reference =
+podaci_test_KNN$Churn, positive = "Yes")
+cat("Tačnost pri korištenju minkowski-3 distance:", cm$overall[1], "\n")
+draw_confusion_matrix(cm)
+
+library(pROC)
+prediction <- predict(kknn_minkowski_3, podaci_test_KNN, type = "prob")
+roc <- roc(podaci_test_KNN$Churn, prediction[, 2], percent = TRUE)
+plot(roc$specificities, roc$sensitivities, type="l", lwd = 2, col =
+"blue", xlim = c(100, 0), ylim = c(0, 100))
+abline(coef = c(100, -1), col = "gray60")
+```
+
+```{r}
+#k-fold cross validacija
+kfold <- function(podaci, k)
+{
+   folds <- split(podaci, cut(sample(1 : nrow(podaci)), k))
+   acc <- rep(NA, length(folds))
+   kappa <- rep(NA, length(folds))
+  
+   for (i in 1:length(folds))
+   {
+     test <- subset(ldply(folds[i], data.frame), select = -c(.id))
+     train <- subset(ldply(folds[-i], data.frame), select = -c(.id))
+     
+     kknn_minkowski_3 <- kknn(formula = Churn ~ ., train = train, test =test, k = 3, distance = 3)
+     cm <- confusionMatrix(data = kknn_minkowski_3$fitted.values, reference =
+test$Churn, positive = "Yes")
+     
+     acc[i] <- cm$overall[1]
+     kappa[i] <- cm$overall[2]
+   }
+   list <- list("acc" = acc, "kappa" = kappa)
+   return (list)
+}
+library(plyr)
+list <- kfold(podaci_KNN, 10)
+acc <- list$acc
+kappa <- list$kappa
+cat("10-fold validacija\n")
+cat("Najveća tačnost:", max(acc), ", fold:", which.max(acc))
+cat(", najveća kappa:", max(kappa), ", fold:", which.max(kappa), "\n")
+cat("Najmanja tačnost:", min(acc), ", fold:", which.min(acc))
+cat(", najmanja kappa:", min(kappa), ", fold:", which.min(kappa), "\n")
+cat("Srednja tačnost:", sum(acc) / length(acc))
+cat(", srednja kappa:", sum(kappa) / length(kappa), "\n\n")
+list <- kfold(podaci_KNN, 5)
+acc <- list$acc
+kappa <- list$kappa
+cat("5-fold validacija\n")
+cat("Najveća tačnost:", max(acc), ", fold:", which.max(acc))
+cat(", najveća kappa:", max(kappa), ", fold:", which.max(kappa), "\n")
+cat("Najmanja tačnost:", min(acc), ", fold:", which.min(acc))
+cat(", najmanja kappa:", min(kappa), ", fold:", which.min(kappa), "\n")
+cat("Srednja tačnost:", sum(acc) / length(acc))
+cat(", srednja kappa:", sum(kappa) / length(kappa), "\n\n")
+```
+
+```{r}
+ansambl <- function(podaci, k)
+{
+ B <- as.integer(length(podaci$Churn) / k)
+podaci_test <- podaci[sample(nrow(podaci), size = B), ]
+lista_predikcija <- list()
+ for (i in 1:k)
+ {
+  podaci_train <- podaci[sample(nrow(podaci), size = length(podaci$Churn) -B),]
+  predictions <- knn(train = subset(podaci_train, select = -c(Churn)), test = subset(podaci_test, select = -c(Churn)), cl = podaci_train$Churn, k = 3)
+  lista_predikcija <- append(lista_predikcija, list(predictions))
+ }
+ result <- c()
+ for(i in 1:B)
+ {
+   no <- 0
+   yes <- 0
+   for(p in lista_predikcija)
+   {
+     if(p[i] == "Yes") yes <- yes + 1
+     else no <- no + 1
+   }
+   if(no > yes) result <- append(result, "No")
+   else result <- append(result, "Yes")
+ }
+ result <- factor(result)
+ cm <- confusionMatrix(data = result, reference = podaci_test$Churn, positive = 'Yes')
+ draw_confusion_matrix(cm)
+}
+ansambl(podaci_KNN, 50)
+```
+
+```{r}
+#podjela na trening i testni podskup
+rows <- sample(nrow(podaci))
+podaci <- podaci[rows, ]
+end <- length(podaci$Churn)
+n <- as.integer(0.85 * end)
+podaci_train <- podaci[1 : n, ]
+podaci_test <- podaci[(n + 1) : end, ]
+
+#Naivni Bayesov model
+naive_bayes <- naiveBayes(Churn ~ ., data=podaci_train)
+predictions <- predict(naive_bayes, subset(podaci_test, select = -c(Churn)))
+
+cm <- confusionMatrix(data = predictions, reference =podaci_test$Churn, positive = "Yes")
+draw_confusion_matrix(cm)
+
+#k-fold unakrsna validacija
+kfold <- function(podaci, k)
+{
+   folds <- split(podaci, cut(sample(1 : nrow(podaci)), k))
+   acc <- rep(NA, length(folds))
+   kappa <- rep(NA, length(folds))
+  
+   for (i in 1:length(folds))
+   {
+     test <- subset(ldply(folds[i], data.frame), select = -c(.id))
+     train <- subset(ldply(folds[-i], data.frame), select = -c(.id))
+     
+     naive_bayes <- naiveBayes(Churn ~ ., data=train)
+predictions <- predict(naive_bayes, subset(test, select = -c(Churn)))
+     
+     cm <- confusionMatrix(data = predictions, reference =test$Churn, positive = "Yes")
+  cm
+     
+     acc[i] <- cm$overall[1]
+     kappa[i] <- cm$overall[2]
+   }
+   list <- list("acc" = acc, "kappa" = kappa)
+   return (list)
+}
+
+list <- kfold(podaci, 10)
+acc <- list$acc
+kappa <- list$kappa
+cat("10-fold validacija\n")
+cat("Najveća tačnost:", max(acc), ", fold:", which.max(acc))
+cat(", najveća kappa:", max(kappa), ", fold:", which.max(kappa), "\n")
+cat("Najmanja tačnost:", min(acc), ", fold:", which.min(acc))
+cat(", najmanja kappa:", min(kappa), ", fold:", which.min(kappa), "\n")
+cat("Srednja tačnost:", sum(acc) / length(acc))
+cat(", srednja kappa:", sum(kappa) / length(kappa), "\n\n")
+list <- kfold(podaci, 5)
+acc <- list$acc
+kappa <- list$kappa
+cat("5-fold validacija\n")
+cat("Najveća tačnost:", max(acc), ", fold:", which.max(acc))
+cat(", najveća kappa:", max(kappa), ", fold:", which.max(kappa), "\n")
+cat("Najmanja tačnost:", min(acc), ", fold:", which.min(acc))
+cat(", najmanja kappa:", min(kappa), ", fold:", which.min(kappa), "\n")
+cat("Srednja tačnost:", sum(acc) / length(acc))
+cat(", srednja kappa:", sum(kappa) / length(kappa), "\n\n")
+```
+
+```{r}
+library(ROSE)
+oversample_podaci <- ovun.sample(Churn ~ ., data = podaci, method = "over",
+N = 2660)$data 
+
+#podjela na trening i testni podskup
+rows <- sample(nrow(oversample_podaci))
+oversample_podaci <- oversample_podaci[rows, ]
+end <- length(oversample_podaci$Churn)
+n <- as.integer(0.85 * end)
+podaci_train_oversample <- oversample_podaci[1 : n, ]
+podaci_test_oversample <- oversample_podaci[(n + 1) : end, ]
+
+
+#Naivni Bayesov model
+naive_bayes <- naiveBayes(Churn ~ ., data=podaci_train_oversample)
+predictions <- predict(naive_bayes, subset(podaci_test_oversample, select = -c(Churn)))
+
+cm <- confusionMatrix(data = predictions, reference =podaci_test_oversample$Churn, positive = "Yes")
+draw_confusion_matrix(cm)
+
+
+#k-fold unakrsna validacija
+list <- kfold(oversample_podaci, 10)
+acc <- list$acc
+kappa <- list$kappa
+cat("10-fold validacija\n")
+cat("Najveća tačnost:", max(acc), ", fold:", which.max(acc))
+cat(", najveća kappa:", max(kappa), ", fold:", which.max(kappa), "\n")
+cat("Najmanja tačnost:", min(acc), ", fold:", which.min(acc))
+cat(", najmanja kappa:", min(kappa), ", fold:", which.min(kappa), "\n")
+cat("Srednja tačnost:", sum(acc) / length(acc))
+cat(", srednja kappa:", sum(kappa) / length(kappa), "\n\n")
+list <- kfold(oversample_podaci, 5)
+acc <- list$acc
+kappa <- list$kappa
+cat("5-fold validacija\n")
+cat("Najveća tačnost:", max(acc), ", fold:", which.max(acc))
+cat(", najveća kappa:", max(kappa), ", fold:", which.max(kappa), "\n")
+cat("Najmanja tačnost:", min(acc), ", fold:", which.min(acc))
+cat(", najmanja kappa:", min(kappa), ", fold:", which.min(kappa), "\n")
+cat("Srednja tačnost:", sum(acc) / length(acc))
+cat(", srednja kappa:", sum(kappa) / length(kappa), "\n\n")
+```
+
+```{r}
+ansambl <- function(podaci, k)
+{
+ B <- as.integer(length(podaci$Churn) / k)
+#sample uzima B elementa iz skupa podataka
+podaci_test <- podaci[sample(nrow(podaci), size = B), ]
+lista_predikcija <- list()
+ for (i in 1:k)
+ {
+  podaci_train <- podaci[sample(nrow(podaci), size = length(podaci$Churn) -B), ]
+  
+  naive_bayes <- naiveBayes(Churn ~ ., data=podaci_train)
+predictions <- predict(naive_bayes, subset(podaci_test, select = -c(Churn)))
+  
+  
+  lista_predikcija <- append(lista_predikcija, list(predictions))
+ }
+ result <- c()
+ for(i in 1:B)
+ {
+   no <- 0
+   yes <- 0
+   for(p in lista_predikcija)
+   {
+     if(p[i] == "Yes") yes <- yes + 1
+     else no <- no + 1
+   }
+   if(yes > no) result <- append(result, "Yes")
+   else result <- append(result, "No")
+ }
+ result <- factor(result)
+ cm <- confusionMatrix(data = result, reference = podaci_test$Churn, positive = 'Yes')
+ draw_confusion_matrix(cm)
+ 
+}
+
+ansambl(oversample_podaci, 50)
+```
+
+```{r}
+#SVM model klasifikacije
+
+podaci_SVM <- podaci
+
+#faktorizacija kategorickih varijabli
+podaci_SVM$gender <- factor(podaci_SVM$gender)
+podaci_SVM$Dependents <- factor(podaci_SVM$Dependents)
+podaci_SVM$PhoneService <- factor(podaci_SVM$PhoneService)
+podaci_SVM$StreamingTV <- factor(podaci_SVM$StreamingTV)
+podaci_SVM$Contract <- factor(podaci_SVM$Contract)
+podaci_SVM$PaymentMethod <- factor(podaci_SVM$PaymentMethod)
+podaci_SVM$InternetService <- factor(podaci_SVM$InternetService)
+podaci_SVM$Churn <- factor(podaci_SVM$Churn)
+
+
+#podjela na trening i testni podskup
+rows <- sample(nrow(podaci_SVM))
+podaci_SVM <- podaci_SVM[rows, ]
+end <- length(podaci_SVM$Churn)
+n <- as.integer(0.85 * end)
+podaci_train_SVM <- podaci_SVM[1 : n, ]
+podaci_test_SVM <- podaci_SVM[(n + 1) : end, ]
+
+library(e1071)
+model <- svm(formula = Churn ~ ., data = podaci_train_SVM, kernel = "linear")
+predictions <- predict(model, newdata = subset(podaci_test_SVM, select = -
+c(Churn)))
+cm <- confusionMatrix(data = predictions, reference = podaci_test_SVM$Churn, positive = "Yes")
+draw_confusion_matrix(cm)
+
+
+#balansiranje
+
+library(ROSE)
+podaci_SVM <- ovun.sample(Churn ~ ., data = podaci_SVM, method = "over",
+N = 2660)$data
+
+#podjela na trening i testni podskup
+rows <- sample(nrow(podaci_SVM))
+podaci_SVM <- podaci_SVM[rows, ]
+end <- length(podaci_SVM$Churn)
+n <- as.integer(0.85 * end)
+podaci_train_SVM <- podaci_SVM[1 : n, ]
+podaci_test_SVM <- podaci_SVM[(n + 1) : end, ]
+
+#decimalno skaliranje MonthlyCharges
+podaci_SVM_decimal_scale <-podaci_SVM
+max <- max(podaci_SVM_decimal_scale$MonthlyCharges)
+j <- 0
+while (10 ** j < max)
+ j = j + 1
+podaci_SVM_decimal_scale <- mutate(podaci_SVM_decimal_scale, MonthlyCharges = MonthlyCharges / 10 ** j)
+
+
+#decimalno skaliranje tenure 
+max <- max(podaci_SVM_decimal_scale$tenure)
+j <- 0
+while (10 ** j < max)
+ j = j + 1
+podaci_SVM_decimal_scale <- mutate(podaci_SVM_decimal_scale, tenure = tenure / 10 ** j)
+
+#min-max normalizacija MonthlyCharges
+podaci_SVM_minmax <-podaci_SVM
+
+max <- max(podaci_SVM_minmax$MonthlyCharges)
+min <- min(podaci_SVM_minmax$MonthlyCharges)
+podaci_SVM_minmax <- mutate(podaci_SVM_minmax, MonthlyCharges = (MonthlyCharges - min) / (max -min))
+
+#min-max normalizacija tenure
+max <- max(podaci_SVM_minmax$tenure)
+min <- min(podaci_SVM_minmax$tenure)
+podaci_SVM_minmax <- mutate(podaci_SVM_minmax, tenure = (tenure - min) / (max -min))
+
+#z-score noramlizacija tenure
+podaci_SVM_zscore <-podaci_SVM
+avg <- median(podaci_SVM_zscore$tenure)
+std <- sd(podaci_SVM_zscore$tenure)
+podaci <- mutate(podaci_SVM_zscore, tenure = (tenure - avg) / std)
+
+#z-score noramlizacija MonthlyCharges
+podaci_SVM_zscore <-podaci_SVM
+avg <- median(podaci_SVM_zscore$MonthlyCharges)
+std <- sd(podaci_SVM_zscore$MonthlyCharges)
+podaci_SVM_zscore <- mutate(podaci, MonthlyCharges = (MonthlyCharges - avg) / std)
+
+
+
+#podjela na trening i testni podskup decimal scale
+rows <- sample(nrow(podaci_SVM_decimal_scale))
+podaci_SVM_decimal_scale <- podaci_SVM_decimal_scale[rows, ]
+end <- length(podaci_SVM_decimal_scale$Churn)
+n <- as.integer(0.85 * end)
+podaci_train_SVM_decimal_scale <- podaci_SVM_decimal_scale[1 : n, ]
+podaci_test_SVM_decimal_scale <- podaci_SVM_decimal_scale[(n + 1) : end, ]
+
+model <- svm(formula = Churn ~ ., data = podaci_train_SVM_decimal_scale, kernel = "linear")
+predictions <- predict(model, newdata = subset(podaci_test_SVM_decimal_scale, select = -
+c(Churn)))
+cm <- confusionMatrix(data = predictions, reference = podaci_test_SVM_decimal_scale$Churn, positive = "Yes")
+draw_confusion_matrix(cm)
+
+#podjela na trening i testni podskup min-max normalizacija
+rows <- sample(nrow(podaci_SVM_minmax))
+podaci_SVM_minmax <- podaci_SVM_minmax[rows, ]
+end <- length(podaci_SVM_minmax$Churn)
+n <- as.integer(0.85 * end)
+podaci_train_SVM_minmax <- podaci_SVM_minmax[1 : n, ]
+podaci_test_SVM_minmax <- podaci_SVM_minmax[(n + 1) : end, ]
+
+model <- svm(formula = Churn ~ ., data = podaci_train_SVM_minmax, kernel = "linear")
+predictions <- predict(model, newdata = subset(podaci_test_SVM_minmax, select = -
+c(Churn)))
+cm <- confusionMatrix(data = predictions, reference = podaci_test_SVM_minmax$Churn, positive = "Yes")
+draw_confusion_matrix(cm)
+
+#podjela na trening i testni podskup z-score normalizacija
+rows <- sample(nrow(podaci_SVM_zscore))
+podaci_SVM_zscore <- podaci_SVM_zscore[rows, ]
+end <- length(podaci_SVM_zscore$Churn)
+n <- as.integer(0.85 * end)
+podaci_train_SVM_zscore <- podaci_SVM_zscore[1 : n, ]
+podaci_test_SVM_zscore <- podaci_SVM_zscore[(n + 1) : end, ]
+
+model <- svm(formula = Churn ~ ., data = podaci_train_SVM_zscore, kernel = "linear")
+predictions <- predict(model, newdata = subset(podaci_test_SVM_zscore, select = -
+c(Churn)))
+cm <- confusionMatrix(data = predictions, reference = podaci_test_SVM_zscore$Churn, positive = "Yes")
+draw_confusion_matrix(cm)
+
+
+```
+
+```{r}
+#k-fold unakrsna validacija
+kfold <- function(podaci, k)
+{
+   folds <- split(podaci, cut(sample(1 : nrow(podaci)), k))
+   acc <- rep(NA, length(folds))
+   kappa <- rep(NA, length(folds))
+  
+   for (i in 1:length(folds))
+   {
+     test <- subset(ldply(folds[i], data.frame), select = -c(.id))
+     train <- subset(ldply(folds[-i], data.frame), select = -c(.id))
+     
+     model <- svm(formula = Churn ~ ., data = train, kernel = "linear")
+predictions <- predict(model, newdata = subset(test, select = -
+c(Churn)))
+cm <- confusionMatrix(data = predictions, reference = test$Churn, positive = "Yes")
+     
+     acc[i] <- cm$overall[1]
+     kappa[i] <- cm$overall[2]
+   }
+   list <- list("acc" = acc, "kappa" = kappa)
+   return (list)
+}
+
+cat("Decimalno skaliranje: \n")
+list <- kfold(podaci_SVM_decimal_scale, 10)
+acc <- list$acc
+kappa <- list$kappa
+cat("10-fold validacija\n")
+cat("Najveća tačnost:", max(acc), ", fold:", which.max(acc))
+cat(", najveća kappa:", max(kappa), ", fold:", which.max(kappa), "\n")
+cat("Najmanja tačnost:", min(acc), ", fold:", which.min(acc))
+cat(", najmanja kappa:", min(kappa), ", fold:", which.min(kappa), "\n")
+cat("Srednja tačnost:", sum(acc) / length(acc))
+cat(", srednja kappa:", sum(kappa) / length(kappa), "\n\n")
+list <- kfold(podaci_SVM_decimal_scale, 5)
+acc <- list$acc
+kappa <- list$kappa
+cat("5-fold validacija\n")
+cat("Najveća tačnost:", max(acc), ", fold:", which.max(acc))
+cat(", najveća kappa:", max(kappa), ", fold:", which.max(kappa), "\n")
+cat("Najmanja tačnost:", min(acc), ", fold:", which.min(acc))
+cat(", najmanja kappa:", min(kappa), ", fold:", which.min(kappa), "\n")
+cat("Srednja tačnost:", sum(acc) / length(acc))
+cat(", srednja kappa:", sum(kappa) / length(kappa), "\n\n")
+
+cat("Min-max normalizacija: \n")
+list <- kfold(podaci_SVM_minmax, 10)
+acc <- list$acc
+kappa <- list$kappa
+cat("10-fold validacija\n")
+cat("Najveća tačnost:", max(acc), ", fold:", which.max(acc))
+cat(", najveća kappa:", max(kappa), ", fold:", which.max(kappa), "\n")
+cat("Najmanja tačnost:", min(acc), ", fold:", which.min(acc))
+cat(", najmanja kappa:", min(kappa), ", fold:", which.min(kappa), "\n")
+cat("Srednja tačnost:", sum(acc) / length(acc))
+cat(", srednja kappa:", sum(kappa) / length(kappa), "\n\n")
+list <- kfold(podaci_SVM_minmax, 5)
+acc <- list$acc
+kappa <- list$kappa
+cat("5-fold validacija\n")
+cat("Najveća tačnost:", max(acc), ", fold:", which.max(acc))
+cat(", najveća kappa:", max(kappa), ", fold:", which.max(kappa), "\n")
+cat("Najmanja tačnost:", min(acc), ", fold:", which.min(acc))
+cat(", najmanja kappa:", min(kappa), ", fold:", which.min(kappa), "\n")
+cat("Srednja tačnost:", sum(acc) / length(acc))
+cat(", srednja kappa:", sum(kappa) / length(kappa), "\n\n")
+
+cat("Z-score normalizacija: \n")
+list <- kfold(podaci_SVM_zscore, 10)
+acc <- list$acc
+kappa <- list$kappa
+cat("10-fold validacija\n")
+cat("Najveća tačnost:", max(acc), ", fold:", which.max(acc))
+cat(", najveća kappa:", max(kappa), ", fold:", which.max(kappa), "\n")
+cat("Najmanja tačnost:", min(acc), ", fold:", which.min(acc))
+cat(", najmanja kappa:", min(kappa), ", fold:", which.min(kappa), "\n")
+cat("Srednja tačnost:", sum(acc) / length(acc))
+cat(", srednja kappa:", sum(kappa) / length(kappa), "\n\n")
+list <- kfold(podaci_SVM_zscore, 5)
+acc <- list$acc
+kappa <- list$kappa
+cat("5-fold validacija\n")
+cat("Najveća tačnost:", max(acc), ", fold:", which.max(acc))
+cat(", najveća kappa:", max(kappa), ", fold:", which.max(kappa), "\n")
+cat("Najmanja tačnost:", min(acc), ", fold:", which.min(acc))
+cat(", najmanja kappa:", min(kappa), ", fold:", which.min(kappa), "\n")
+cat("Srednja tačnost:", sum(acc) / length(acc))
+cat(", srednja kappa:", sum(kappa) / length(kappa), "\n\n")
+```
+
+```{r}
+#decimalno skaliranje MonthlyCharges
+max <- max(podaci_SVM$MonthlyCharges)
+j <- 0
+while (10 ** j < max)
+ j = j + 1
+podaci_SVM <- mutate(podaci_SVM, MonthlyCharges = MonthlyCharges / 10 ** j)
+
+
+#decimalno skaliranje tenure 
+max <- max(podaci_SVM$tenure)
+j <- 0
+while (10 ** j < max)
+ j = j + 1
+podaci_SVM <- mutate(podaci_SVM, tenure = tenure / 10 ** j)
+
+
+```
+
+```{r}
+#tuning parametara
+library(tune)
+
+podaci_SVM$gender <- as.numeric(podaci_SVM$gender)
+podaci_SVM$Dependents <- as.numeric(podaci_SVM$Dependents)
+podaci_SVM$PhoneService <- as.numeric(podaci_SVM$PhoneService)
+podaci_SVM$StreamingTV <- as.numeric(podaci_SVM$StreamingTV)
+podaci_SVM$Contract <- as.numeric(podaci_SVM$Contract)
+podaci_SVM$PaymentMethod <- as.numeric(podaci_SVM$PaymentMethod)
+podaci_SVM$InternetService <- as.numeric(podaci_SVM$InternetService)
+podaci_SVM$Churn <- as.numeric(podaci_SVM$Churn)
+
+tuning <- tune.svm(formula = Churn ~ .,
+ x = subset(podaci_SVM, select = -c(Churn)),
+ y = podaci_SVM$Churn,
+ cost = c(1, 5, 10, 25, 50), gamma = c(0.001, 0.01,
+0.1, 1))
+cat("Najbolja vrijednost cost:", tuning$best.parameters$cost, "\n")
+cat("Najbolja vrijednost gamma:", tuning$best.parameters$gamma, "\n")
+cat("Najveća tačnost:", 1.00 - tuning$best.performance)
+plot(tuning)
+```
+
+```{r}
+model_linear <- svm(formula = Churn ~ ., data = podaci_train_SVM, kernel =
+"linear", cost = 5, gamma = 1)
+predictions <- predict(model_linear, newdata = subset(podaci_test_SVM, select = -
+c(Churn)))
+cm_linear <- confusionMatrix(data = predictions, reference = podaci_test_SVM$Churn, positive = "Yes")
+draw_confusion_matrix(cm_linear)
+
+
+model_polynomial <- svm(formula = Churn ~ ., data = podaci_train_SVM, kernel =
+"polynomial", cost = 5, gamma = 1)
+predictions <- predict(model_polynomial, newdata = subset(podaci_test_SVM, select = -
+c(Churn)))
+cm_polynomial <- confusionMatrix(data = predictions, reference = podaci_test_SVM$Churn, positive = "Yes")
+draw_confusion_matrix(cm_polynomial)
+
+model_radial <- svm(formula = Churn ~ ., data = podaci_train_SVM, kernel =
+"radial", cost = 5, gamma = 1)
+predictions <- predict(model_radial, newdata = subset(podaci_test_SVM, select = -
+c(Churn)))
+cm_radial <- confusionMatrix(data = predictions, reference = podaci_test_SVM$Churn, positive = "Yes")
+draw_confusion_matrix(cm_radial)
+
+model_sigmoid <- svm(formula = Churn ~ ., data = podaci_train_SVM, kernel =
+"sigmoid", cost = 5, gamma = 1)
+predictions <- predict(model_sigmoid, newdata = subset(podaci_test_SVM, select = -
+c(Churn)))
+cm_sigmoid <- confusionMatrix(data = predictions, reference = podaci_test_SVM$Churn, positive = "Yes")
+draw_confusion_matrix(cm_sigmoid)
+
+cat("Accuracy - linear kernel: ", cm_linear$overall[1], "\n")
+cat("Accuracy - polynomial kernel: ", cm_polynomial$overall[1], "\n")
+cat("Accuracy - radial kernel: ", cm_radial$overall[1], "\n")
+cat("Accuracy - sigmoid kernel: ", cm_sigmoid$overall[1], "\n")
+```
+
+```{r}
+model_radial <- svm(formula = Churn ~ ., data = podaci_train_SVM, kernel =
+"radial", cost = 5, gamma = 1)
+predictions <- predict(model_radial, newdata = subset(podaci_test_SVM, select = -
+c(Churn)))
+library(pROC)
+predictions <- as.numeric(predictions)
+roc <- roc(podaci_test_SVM$Churn, predictions, percent = TRUE)
+plot(roc$specificities, roc$sensitivities, type="l", lwd = 2, col =
+"blue", xlim = c(100, 0), ylim = c(0, 100))
+abline(coef = c(100, -1), col = "gray60")
+```
+
+```{r}
+ansambl <- function(podaci, k)
+{
+ B <- as.integer(length(podaci$Churn) / k)
+#sample uzima B elementa iz skupa podataka
+podaci_test <- podaci[sample(nrow(podaci), size = B), ]
+lista_predikcija <- list()
+ for (i in 1:k)
+ {
+  podaci_train <- podaci[sample(nrow(podaci), size = length(podaci$Churn) -B), ]
+  
+  model_linear <- svm(formula = Churn ~ ., data = podaci_train, kernel =
+"linear", cost = 5, gamma = 1)
+predictions <- predict(model_linear, newdata = subset(podaci_test, select = -
+c(Churn)))
+  lista_predikcija <- append(lista_predikcija, list(predictions))
+ }
+ result <- c()
+ for(i in 1:B)
+ {
+   no <- 0
+   yes <- 0
+   for(p in lista_predikcija)
+   {
+     if(p[i] == "Yes") yes <- yes + 1
+     else no <- no + 1
+   }
+   if(yes > no) result <- append(result, "Yes")
+   else result <- append(result, "No")
+ }
+ result <- factor(result)
+ cm <- confusionMatrix(data = result, reference = podaci_test$Churn, positive = 'Yes')
+ draw_confusion_matrix(cm)
+ 
+}
+
+ansambl(podaci_SVM, 50)
+```
+
+```{r}
+ansambl <- function(podaci, k)
+{
+ B <- as.integer(length(podaci$Churn) / k)
+#sample uzima B elementa iz skupa podataka
+podaci_test <- podaci[sample(nrow(podaci), size = B), ]
+lista_predikcija <- list()
+ for (i in 1:k)
+ {
+  podaci_train <- podaci[sample(nrow(podaci), size = length(podaci$Churn) -B), ]
+  
+  model_radial <- svm(formula = Churn ~ ., data = podaci_train, kernel =
+"radial", cost = 5, gamma = 1)
+predictions <- predict(model_radial, newdata = subset(podaci_test, select = -
+c(Churn)))
+  lista_predikcija <- append(lista_predikcija, list(predictions))
+ }
+ result <- c()
+ for(i in 1:B)
+ {
+   no <- 0
+   yes <- 0
+   for(p in lista_predikcija)
+   {
+     if(p[i] == "Yes") yes <- yes + 1
+     else no <- no + 1
+   }
+   if(yes > no) result <- append(result, "Yes")
+   else result <- append(result, "No")
+ }
+ result <- factor(result)
+ cm <- confusionMatrix(data = result, reference = podaci_test$Churn, positive = 'Yes')
+ draw_confusion_matrix(cm)
+ 
+}
+
+ansambl(podaci_SVM, 50)
+```
+
+```{r}
+#Model logističke regresije
+#faktorizacija kategorickih varijabli
+podaci_logisticka <-podaci
+podaci_logisticka$gender <- factor(podaci_logisticka$gender)
+podaci_logisticka$Dependents <- factor(podaci_logisticka$Dependents)
+podaci_logisticka$PhoneService <- factor(podaci_logisticka$PhoneService)
+podaci_logisticka$StreamingTV <- factor(podaci_logisticka$StreamingTV)
+podaci_logisticka$Contract <- factor(podaci_logisticka$Contract)
+podaci_logisticka$PaymentMethod <- factor(podaci_logisticka$PaymentMethod)
+podaci_logisticka$InternetService <- factor(podaci_logisticka$InternetService)
+podaci_logisticka$Churn <- factor(podaci_logisticka$Churn)
+
+#podjela skupa podataka na trening i testni skup
+rows <- sample(nrow(podaci_logisticka))
+podaci_logisticka <- podaci_logisticka[rows, ]
+end <- length(podaci_logisticka$Churn)
+n <- as.integer(0.85 * end)
+podaci_train_logisticka <- podaci_logisticka[1 : n, ]
+podaci_test_logisticka <- podaci_logisticka[(n + 1) : end, ]
+
+model <- glm(formula = Churn ~ ., data = podaci_train_logisticka, family = binomial(link
+= "logit"))
+predictions <- predict(model, newdata = subset(podaci_test_logisticka, select = -
+c(Churn)), type= "response", positive = "Yes")
+predictions[predictions > 0.5] <- "Yes"
+predictions[predictions <= 0.5] <- "No"
+predictions <- factor(predictions, levels = c("No", "Yes"))
+cm <- confusionMatrix(data = predictions, reference = podaci_test_logisticka$Churn)
+cat("Accuracy:", cm$overall[1])
+
+draw_confusion_matrix(cm)
+
+#k-fold unakrsna validacija
+kfold <- function(podaci, k)
+{
+   folds <- split(podaci, cut(sample(1 : nrow(podaci)), k))
+   acc <- rep(NA, length(folds))
+   kappa <- rep(NA, length(folds))
+  
+   for (i in 1:length(folds))
+   {
+     test <- subset(ldply(folds[i], data.frame), select = -c(.id))
+     train <- subset(ldply(folds[-i], data.frame), select = -c(.id))
+     
+     model <- glm(formula = Churn ~ ., data = train, family = binomial(link
+= "logit"))
+predictions <- predict(model, newdata = subset(test, select = -
+c(Churn)), type= "response", positive = "Yes")
+predictions[predictions > 0.5] <- "Yes"
+predictions[predictions <= 0.5] <- "No"
+predictions <- factor(predictions, levels = c("No", "Yes"))
+cm <- confusionMatrix(data = predictions, reference = test$Churn)
+     
+     acc[i] <- cm$overall[1]
+     kappa[i] <- cm$overall[2]
+   }
+   list <- list("acc" = acc, "kappa" = kappa)
+   return (list)
+}
+
+list <- kfold(podaci_logisticka, 10)
+acc <- list$acc
+kappa <- list$kappa
+cat("10-fold validacija\n")
+cat("Najveća tačnost:", max(acc), ", fold:", which.max(acc))
+cat(", najveća kappa:", max(kappa), ", fold:", which.max(kappa), "\n")
+cat("Najmanja tačnost:", min(acc), ", fold:", which.min(acc))
+cat(", najmanja kappa:", min(kappa), ", fold:", which.min(kappa), "\n")
+cat("Srednja tačnost:", sum(acc) / length(acc))
+cat(", srednja kappa:", sum(kappa) / length(kappa), "\n\n")
+list <- kfold(podaci_logisticka, 5)
+acc <- list$acc
+kappa <- list$kappa
+cat("5-fold validacija\n")
+cat("Najveća tačnost:", max(acc), ", fold:", which.max(acc))
+cat(", najveća kappa:", max(kappa), ", fold:", which.max(kappa), "\n")
+cat("Najmanja tačnost:", min(acc), ", fold:", which.min(acc))
+cat(", najmanja kappa:", min(kappa), ", fold:", which.min(kappa), "\n")
+cat("Srednja tačnost:", sum(acc) / length(acc))
+cat(", srednja kappa:", sum(kappa) / length(kappa), "\n\n")
+
+
+
+
+```
+
+```{r}
+
+library(ROSE)
+podaci_logisticka_oversample <- ovun.sample(Churn ~ ., data = podaci_logisticka, method = "over",
+N = 2660)$data 
+
+#decimalno skaliranje MonthlyCharges
+max <- max(podaci_logisticka$MonthlyCharges)
+j <- 0
+while (10 ** j < max)
+ j = j + 1
+podaci_logisticka <- mutate(podaci_logisticka, MonthlyCharges = MonthlyCharges / 10 ** j)
+
+
+#decimalno skaliranje tenure 
+max <- max(podaci_logisticka$tenure)
+j <- 0
+while (10 ** j < max)
+ j = j + 1
+podaci_logisticka <- mutate(podaci_logisticka, tenure = tenure / 10 ** j)
+
+list <- kfold(podaci_logisticka, 10)
+acc <- list$acc
+kappa <- list$kappa
+cat("10-fold validacija\n")
+cat("Najveća tačnost:", max(acc), ", fold:", which.max(acc))
+cat(", najveća kappa:", max(kappa), ", fold:", which.max(kappa), "\n")
+cat("Najmanja tačnost:", min(acc), ", fold:", which.min(acc))
+cat(", najmanja kappa:", min(kappa), ", fold:", which.min(kappa), "\n")
+cat("Srednja tačnost:", sum(acc) / length(acc))
+cat(", srednja kappa:", sum(kappa) / length(kappa), "\n\n")
+list <- kfold(podaci_logisticka, 5)
+acc <- list$acc
+kappa <- list$kappa
+cat("5-fold validacija\n")
+cat("Najveća tačnost:", max(acc), ", fold:", which.max(acc))
+cat(", najveća kappa:", max(kappa), ", fold:", which.max(kappa), "\n")
+cat("Najmanja tačnost:", min(acc), ", fold:", which.min(acc))
+cat(", najmanja kappa:", min(kappa), ", fold:", which.min(kappa), "\n")
+cat("Srednja tačnost:", sum(acc) / length(acc))
+cat(", srednja kappa:", sum(kappa) / length(kappa), "\n\n")
+```
+
+```{r}
+ansambl <- function(podaci, k)
+{
+ B <- as.integer(length(podaci$Churn) / k)
+#sample uzima B elementa iz skupa podataka
+podaci_test <- podaci[sample(nrow(podaci), size = B), ]
+lista_predikcija <- list()
+ for (i in 1:k)
+ {
+  podaci_train <- podaci[sample(nrow(podaci), size = length(podaci$Churn) -B), ]
+  
+  model <- glm(formula = Churn ~ ., data = podaci_train, family = binomial(link
+= "logit"))
+predictions <- predict(model, newdata = subset(podaci_test, select = -
+c(Churn)), type= "response", positive = "Yes")
+predictions[predictions > 0.5] <- "Yes"
+predictions[predictions <= 0.5] <- "No"
+predictions <- factor(predictions, levels = c("No", "Yes"))
+lista_predikcija <- append(lista_predikcija, list(predictions))
+ }
+ result <- c()
+ for(i in 1:B)
+ {
+   no <- 0
+   yes <- 0
+   for(p in lista_predikcija)
+   {
+     if(p[i] == "Yes") yes <- yes + 1
+     else no <- no + 1
+   }
+   if(yes > no) result <- append(result, "Yes")
+   else result <- append(result, "No")
+ }
+ result <- factor(result)
+ cm <- confusionMatrix(data = result, reference = podaci_test$Churn, positive = 'Yes')
+ draw_confusion_matrix(cm)
+}
+
+ansambl(podaci_logisticka, 50)
+```
+
+## Zadatak 1. b) (Testiranje najboljeg modela)(bez neuralnih mreža)
+
+-   Tačnost veća od 0.75
+
+-   F1-mjera veća od 0.65
+
+-   Kappa statistika veća od 0.25
+
+-   Osjetljivost veća od 0.70
+
+-   Specifičnost veća od 0.75
+
+```{r}
+#svm sa radijalnom kernel funkcijom
+#konfuzijska matrica za svm radial model
+draw_confusion_matrix(cm_radial)
+#ucitavanje testnog skupa podataka
+podaci_testni <- read.csv("customer_data_test.csv", fileEncoding = 'UTF-8')
+#faktorizacija kategorickih varijabli
+podaci_testni$gender <- factor(podaci_testni$gender)
+podaci_testni$Dependents <- factor(podaci_testni$Dependents)
+podaci_testni$PhoneService <- factor(podaci_testni$PhoneService)
+podaci_testni$MultipleLines <- factor(podaci_testni$MultipleLines)
+podaci_testni$InternetService <- factor(podaci_testni$InternetService)
+podaci_testni$StreamingMovies <- factor(podaci_testni$StreamingMovies)
+podaci_testni$StreamingTV <- factor(podaci_testni$StreamingTV)
+podaci_testni$Contract <- factor(podaci_testni$Contract)
+podaci_testni$PaymentMethod <- factor(podaci_testni$PaymentMethod)
+podaci_testni$Churn <- factor(podaci_testni$Churn)
+#testiranje nad testnim skupom podataka
+
+```
+
+```{r}
+library(rpart)
+library(ipred)
+set.seed(5)
+ predictions <- predict(model_radial, newdata = subset(podaci_testni, select = -
+ c(Churn)))
+ 
+ cm_initial <- confusionMatrix(data = predictions, reference = podaci_testni$Churn)
+ 
+ draw_confusion_matrix(cm_initial)
+```
+
+## Zadatak 2. (Višestruka linearna regresija)
+
+```{r}
+podaci2 <- read.csv("podaci_novi.csv", fileEncoding = 'UTF-8')
+```
+
+```{r}
+#sum(is.na(podaci2$CustomerSuitability))
+#Popunjavanje na vrijednosti u MultipleLines
+for(i in 1 : length(podaci2$MultipleLines))
+{
+  if(is.na(podaci2$MultipleLines[i])==TRUE){
+    podaci2$MultipleLines[i]<- "No"
+  }  
+}
+
+#Popunjavanje na vrijednosti u StreamingMovies
+for(i in 1 : length(podaci2$StreamingMovies))
+{
+  if(is.na(podaci2$StreamingMovies[i])==TRUE){
+    podaci2$StreamingMovies[i]<- "No"
+  }  
+}
+
+#Popunjavanje na vrijednosti u Churn
+for(i in 1 : length(podaci2$Churn))
+{
+  if(is.na(podaci2$Churn[i])==TRUE){
+    podaci2$Churn[i]<- "No"
+  }  
+}
+```
+
+```{r}
+k<-0
+for (i in 1 : length(podaci2$gender)) 
+{ 
+  if(podaci2$Dependents[i]=="No" && podaci2$PhoneService[i]=="Yes" && podaci2$MultipleLines[i]=="Yes"      
+    && podaci2$StreamingTV[i]=="Yes" && podaci2$StreamingMovies[i]=="Yes" && podaci2$InternetService[i]=="Yes")         {
+      podaci2$CustomerSuitability[i] <- 1   
+  }
+  
+  else if (podaci2$Churn[i] == "Yes" && podaci2$PhoneService[i] == "Yes" && podaci2$MultipleLines[i]!="Yes" && podaci2$StreamingTV[i] != "Yes" && podaci2$StreamingMovies[i] != "Yes" && podaci2$InternetService[i] == "No"){
+    podaci2$CustomerSuitability[i] <- 0
+  }
+  
+  else if (podaci2$Churn[i] == "Yes" && podaci2$PhoneService[i] != "Yes" && podaci2$MultipleLines[i]=="Yes" && podaci2$StreamingTV[i] != "Yes" && podaci2$StreamingMovies[i] != "Yes" && podaci2$InternetService[i] == "No"){
+    podaci2$CustomerSuitability[i] <- 0
+  }
+  
+  else if (podaci2$Churn[i] == "Yes" && podaci2$PhoneService[i] != "Yes" && podaci2$MultipleLines[i]!="Yes" && podaci2$StreamingTV[i] == "Yes" && podaci2$StreamingMovies[i] != "Yes" && podaci2$InternetService[i] == "No"){
+    podaci2$CustomerSuitability[i] <- 0
+  }
+  
+  else if (podaci2$Churn[i] == "Yes" && podaci2$PhoneService[i] != "Yes" && podaci2$MultipleLines[i]!="Yes" && podaci2$StreamingTV[i] != "Yes" && podaci2$StreamingMovies[i] == "Yes" && podaci2$InternetService[i] == "No"){
+    podaci2$CustomerSuitability[i] <- 0
+  }
+  
+  else if (podaci2$Churn[i] == "Yes" && podaci2$PhoneService[i] != "Yes" && podaci2$MultipleLines[i]!="Yes" && podaci2$StreamingTV[i] != "Yes" && podaci2$StreamingMovies[i] != "Yes" && podaci2$InternetService[i] != "No"){
+    podaci2$CustomerSuitability[i] <- 0
+  }
+  
+  else if(podaci2$tenure[i]>24 && podaci2$MonthlyCharges[i]>75 ){
+    if(podaci2$PaymentMethod[i]=="Credit card (automatic)") {
+      k<-2
+    }else if(podaci2$PaymentMethod[i]=="Mailed check"){
+      k<-1
+    }
+    else{
+      k<-3
+    }
+
+    b<-((k+podaci2$DailyCharges[i])/(k+max(podaci2$DailyCharges)))
+    podaci2$CustomerSuitability[i] <- b
+  }
+  else{
+    if(podaci2$Contract[i]=="Two year") {
+      k<-2
+    }else if(podaci2$Contract[i]=="One year"){
+      k<-1
+    }
+    else{
+      k<-3
+    }
+    b<-((k+podaci2$TotalCharges[i])/(k+max(podaci2$TotalCharges)))
+    podaci2$CustomerSuitability[i] <- b
+  }
+  
+}
+
+```
+
+```{r}
+podaci2$gender <- factor(podaci2$gender)
+podaci2$Dependents <- factor(podaci2$Dependents)
+podaci2$PhoneService <- factor(podaci2$PhoneService)
+podaci2$InternetService <- factor(podaci2$InternetService)
+podaci2$StreamingTV <- factor(podaci2$StreamingTV)
+podaci2$Contract <- factor(podaci2$Contract)
+podaci2$PaymentMethod <- factor(podaci2$PaymentMethod)
+podaci2$MonthlyCharges <- factor(podaci2$MonthlyCharges)
+podaci2$Churn <- factor(podaci2$Churn)
+podaci2$MultipleLines <- factor(podaci2$MultipleLines)
+podaci2$StreamingMovies <- factor(podaci2$StreamingMovies)
+
+
+
+podaci2$gender <- as.numeric(podaci2$gender)
+podaci2$Dependents <- as.numeric(podaci2$Dependents)
+podaci2$PhoneService <- as.numeric(podaci2$PhoneService)
+podaci2$InternetService <- as.numeric(podaci2$InternetService)
+podaci2$StreamingTV <- as.numeric(podaci2$StreamingTV)
+podaci2$Contract <- as.numeric(podaci2$Contract)
+podaci2$PaymentMethod <- as.numeric(podaci2$PaymentMethod)
+podaci2$MonthlyCharges <- as.numeric(podaci2$MonthlyCharges)
+podaci2$Churn <- as.numeric(podaci2$Churn)
+podaci2$MultipleLines <- as.numeric(podaci2$MultipleLines)
+podaci2$StreamingMovies <- as.numeric(podaci2$StreamingMovies)
+```
+
+```{r}
+#podjela na trening i testni podskup
+rows <- sample(nrow(podaci2))
+podaci2 <- podaci2[rows, ]
+end <- length(podaci2$Churn)
+n <- as.integer(0.85 * end)
+podaci_train_2 <- podaci2[1 : n, ]
+podaci_test_2 <- podaci2[(n + 1) : end, ]
+```
+
+```{r}
+model_lin_reg <-lm(CustomerSuitability~.,data = podaci_train_2)
+summary(model_lin_reg)
+predictions_linear <-predict(model_lin_reg,newdata = podaci_test_2)
+
+par(mfrow=c(2,2))
+plot(model_lin_reg)
+par(mfrow=c(1,1))
+
+plot(density(model_lin_reg$residuals))
+```
+
+```{r}
+library(caret)
+MAE(podaci_test_2$CustomerSuitability,predictions_linear)
+RMSE(podaci_test_2$CustomerSuitability,predictions_linear)
+R2(podaci_test_2$CustomerSuitability,predictions_linear,form = "traditional")
+
+```
+
+```{r}
+r2 = R2(podaci_test_2$CustomerSuitability,predictions_linear,form = "traditional")
+VIF = 1 / (1 - r2)
+cat("VIF:", VIF)
+
+library(reshape2)
+library(ggplot2)
+
+get_upper_tri <- function(cormat){
+ cormat[lower.tri(cormat)]<- NA
+ return(cormat)
+}
+podaci2_brojcani <- subset(podaci2, select = c(tenure,DailyCharges,MonthlyCharges,TotalCharges))
+
+# kreiranje korelacijske matrice za sve podatke
+cormat <- round(cor(podaci2_brojcani), 2)
+# odsijecanje gornjeg dijela matrice
+upper_tri <- get_upper_tri(cormat)
+melted_cormat <- melt(upper_tri, na.rm = TRUE)
+
+ggheatmap <- ggplot(data = melted_cormat, aes(Var2, Var1, fill = value))+
+geom_tile(color = "white")+
+scale_fill_gradient2(low = "blue", high = "red", mid = "white",
+ midpoint = 0.5, limit = c(0,1), space = "Lab",
+ name="Pearson\nCorrelation") +
+ theme_minimal()+
+theme(axis.text.x = element_text(angle = 45, vjust = 1,
+ size = 12, hjust = 1))+
+coord_fixed()
+ggheatmap +
+geom_text(aes(Var2, Var1, label = value), color = "black", size = 4) +
+theme(
+ axis.title.x = element_blank(),
+ axis.title.y = element_blank(),
+ panel.grid.major = element_blank(),
+ panel.border = element_blank(),
+ panel.background = element_blank(),
+ axis.ticks = element_blank(),
+ legend.justification = c(1, 0),
+ legend.position = c(0.6, 0.7),
+ legend.direction = "horizontal")+
+ guides(fill = guide_colorbar(barwidth = 7, barheight = 1,
+ title.position = "top", title.hjust = 0.5))
+
+ ggheatmap
+```
+
+```{r}
+podaci2 <- subset(podaci2, select = -c(DailyCharges))
+
+#podjela na trening i testni podskup
+rows <- sample(nrow(podaci2))
+podaci2 <- podaci2[rows, ]
+end <- length(podaci2$Churn)
+n <- as.integer(0.85 * end)
+podaci_train_2 <- podaci2[1 : n, ]
+podaci_test_2 <- podaci2[(n + 1) : end, ]
+
+model_lin_reg <-lm(CustomerSuitability~.,data = podaci_train_2)
+summary(model_lin_reg)
+predictions_linear <-predict(model_lin_reg,newdata = podaci_test_2)
+
+par(mfrow=c(2,2))
+plot(model_lin_reg)
+par(mfrow=c(1,1))
+
+plot(density(model_lin_reg$residuals))
+
+r2 = R2(podaci_test_2$CustomerSuitability,predictions_linear,form = "traditional")
+VIF = 1 / (1 - r2)
+cat("VIF:", VIF," ")
+
+MAE(podaci_test_2$CustomerSuitability,predictions_linear)
+RMSE(podaci_test_2$CustomerSuitability,predictions_linear)
+R2(podaci_test_2$CustomerSuitability,predictions_linear,form = "traditional")
+```
+
+```{r}
+library(plyr)
+library(caret)
+ensemble <- function(podaci, k)
+{
+ lista_predikcija <- list()
+ result <- c()
+ B <- as.integer(length(podaci$gender) / k)
+ test <- podaci[sample(nrow(podaci), size = B), ]
+ for (i in 1:k)
+ {
+  train <- podaci[sample(nrow(podaci), size = length(podaci$gender) -B), ]
+ 
+  model_lin_reg <-lm(CustomerSuitability~.,data = train)
+
+  predictions_linear <-predict(model_lin_reg,newdata = test)
+  lista_predikcija <- append(lista_predikcija,list(predictions_linear))
+ 
+ }
+ 
+ for(i in 1:B){
+  suma<-0
+  for(p in lista_predikcija){
+    suma<-suma+p[i]
+  }
+  r <- suma/B
+  result <- append(result,r)
+ }
+ cat(MAE(test$CustomerSuitability,result)," " )
+ cat(RMSE(test$CustomerSuitability,result)," ")
+ cat(R2(result,test$CustomerSuitability,form = "traditional"))
+  
+ return (list)
+}
+```
+
+```{r}
+list <- ensemble(podaci2, 50)
+```

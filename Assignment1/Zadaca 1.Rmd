@@ -1,0 +1,1562 @@
+---
+title: "Zadaća 1"
+output:
+  html_document:
+    df_print: default
+  word_document: default
+---
+
+Studenti:
+
+    Vedad Beglerović, Vildana Beglerović, Lejla Buturović
+
+Nastavna grupa:
+
+    Grupa 1
+
+## Zadatak 1 (Istraživanje podataka)
+
+Upoznati se sa setom podataka i analizirati sve njegove karakteristike koristeći:\
+- osnovne metode deskriptivne statistike, kao i:\
+- metode procjene lokacije i varijabilnosti podataka;\
+- metode za procjenu korelacije između varijabli.
+
+\
+Na osnovu izvršene analize potrebno je preprocesirati podatke za primjenu drveta odlučivanja (pročitati i povezati sa zadatkom 2).
+
+Preprocesiranje podataka treba između ostalog da uključi:\
+- popunjavanje svih nedostajućih vrijednosti;\
+- odbacivanje svih pronađenih outliera;\
+- odbacivanje atributa sa visokim stepenom korelacije;\
+- vršenje transformacija podataka.
+
+\
+Sve izvršene korake potrebno je detaljno dokumentovati i objasniti razloge za primjenu odabranih metoda za sve atribute seta podataka. Obavezno koristiti ggplot2 napredne vizualizacijske funkcije za neke od grafika, na način kako je to urađeno u vježbi 2.
+
+```{r}
+podaci <- read.csv("customer_data_train.csv", fileEncoding = 'UTF-8')
+```
+
+Osnovne metode deskriprivne statistike:
+
+```{r}
+cat("Broj instanci: ", length(podaci$gender))
+cat("Broj atributa: ", length(podaci))
+head(podaci)
+cat("Kategorije spolova: ", unique(podaci$gender),
+"\nKategorije izdrzavanja (dependents): ", unique(podaci$Dependents),
+"\nKategorije PhoneServices: ", unique(podaci$PhoneService),
+"\nKategorije (brojevi) nekretnina mušterije koji koriste usluge: ", sort(unique(podaci$tenure)),
+"\nKategorije MulitpleLines: ", unique(podaci$MultipleLines),
+"\nKategorije InternetService: ", unique(podaci$InternetService),
+"\nKategorije StreamingTV: ", unique(podaci$StreamingTV),
+"\nKategorije StreamingMovies: ", unique(podaci$StreamingMovies),
+"\nKategorije ugovora: ", unique(podaci$Contract),
+"\nKategorije metode plaćanja: ", unique(podaci$PaymentMethod),
+"\nKategorije Churn: ", unique(podaci$Churn))
+
+
+
+```
+
+```{r}
+#crtanje boxplotova za numeričke varijable
+summary <- lapply(podaci, summary)
+summary
+num_cols <- subset(podaci, select = c(tenure, DailyCharges, MonthlyCharges, TotalCharges)) 
+boxplots <- lapply(num_cols, boxplot)
+boxplots
+```
+
+```{r}
+#bar charts za kategoricke varijable
+for (i in colnames(podaci)){
+  if (class(podaci[[i]]) == "character")
+    barplot(table(podaci[[i]]),
+    main=colnames(podaci[i]),
+    ylim= c(0, length(podaci[[i]])),
+    ylab="Broj",
+    border="red",
+    col="blue",
+    density=10
+    )
+}
+
+```
+
+Metode za procjenu korelacije između varijabli:
+
+Analiza korelacije između numeričkih atributa - `tenure`, `DailyCharges`, `MonthlyCharges`, `TotalCharges` (Pearsonova korelacija):
+
+```{r}
+library(reshape2)
+library(ggplot2)
+# funkcija za odsijecanje gornjeg dijela matrice
+get_upper_tri <- function(cormat){
+ cormat[lower.tri(cormat)]<- NA
+ return(cormat)
+}
+# korelacijski koeficijent koristeći NA podatke ima rezultnu vrijednost NA
+podaci_brojcani <- subset(podaci, select = c(tenure,DailyCharges,MonthlyCharges,TotalCharges))
+podaci_brojcani_bez_na <- na.omit(podaci_brojcani)
+# kreiranje korelacijske matrice za sve podatke
+cormat <- round(cor(podaci_brojcani_bez_na), 2)
+# odsijecanje gornjeg dijela matrice
+upper_tri <- get_upper_tri(cormat)
+melted_cormat <- melt(upper_tri, na.rm = TRUE)
+
+ggheatmap <- ggplot(data = melted_cormat, aes(Var2, Var1, fill = value))+
+geom_tile(color = "white")+
+scale_fill_gradient2(low = "blue", high = "red", mid = "white",
+ midpoint = 0.5, limit = c(0,1), space = "Lab",
+ name="Pearson\nCorrelation") +
+ theme_minimal()+
+theme(axis.text.x = element_text(angle = 45, vjust = 1,
+ size = 12, hjust = 1))+
+coord_fixed()
+ggheatmap +
+geom_text(aes(Var2, Var1, label = value), color = "black", size = 4) +
+theme(
+ axis.title.x = element_blank(),
+ axis.title.y = element_blank(),
+ panel.grid.major = element_blank(),
+ panel.border = element_blank(),
+ panel.background = element_blank(),
+ axis.ticks = element_blank(),
+ legend.justification = c(1, 0),
+ legend.position = c(0.6, 0.7),
+ legend.direction = "horizontal")+
+ guides(fill = guide_colorbar(barwidth = 7, barheight = 1,
+ title.position = "top", title.hjust = 0.5))
+
+ ggheatmap
+```
+
+S obzirom da su atributi koji opisuju mjesečnu i dnevnu naplatu u snažnoj korelaciji - koeficijent im je 1, definitivno ćemo odbaciti jednu od ove dvije kolone. Provjerit ćemo koja kolona ima više NA vrijednosti:
+
+```{r}
+cat("Broj NA vrijednosti u koloni MonthlyCharges: ",length(subset(podaci, {is.na(podaci$MonthlyCharges)})$MonthlyCharges), "\nBroj NA vrijednosti u koloni DailyCharges: ",length(subset(podaci, {is.na(podaci$DailyCharges)})$DailyCharges))
+podaci <- subset(podaci, select = -c(DailyCharges))
+```
+
+```{r}
+cat("Broj NA vrijednosti u koloni TotalCharges: ",length(subset(podaci, {is.na(podaci$TotalCharges)})$TotalCharges), "\nBroj NA vrijednosti u koloni tenure: ",length(subset(podaci, {is.na(podaci$tenre)})$tenure))
+#naknadno cemo odbaciti kolonu totalCharges
+```
+
+```{r}
+library(tidyverse)
+podaci_brojcani <- podaci_brojcani %>% 
+mutate_if(is.numeric, function(x) ifelse(is.na(x), median(x, na.rm = T), x))
+# funkcija za odsijecanje gornjeg dijela matrice
+get_upper_tri <- function(cormat){
+ cormat[lower.tri(cormat)]<- NA
+ return(cormat)
+}
+# korelacijski koeficijent koristeći NA podatke ima rezultnu vrijednost NA
+#podaci_brojcani <- subset(podaci, select = c(tenure,DailyCharges,MonthlyCharges,TotalCharges))
+#podaci_brojcani_bez_na <- na.omit(podaci_brojcani)
+# kreiranje korelacijske matrice za sve podatke
+cormat <- round(cor(podaci_brojcani), 2)
+# odsijecanje gornjeg dijela matrice
+upper_tri <- get_upper_tri(cormat)
+melted_cormat <- melt(upper_tri, na.rm = TRUE)
+
+ggheatmap <- ggplot(data = melted_cormat, aes(Var2, Var1, fill = value))+
+geom_tile(color = "white")+
+scale_fill_gradient2(low = "blue", high = "red", mid = "white",
+ midpoint = 0.5, limit = c(0,1), space = "Lab",
+ name="Pearson\nCorrelation") +
+ theme_minimal()+
+theme(axis.text.x = element_text(angle = 45, vjust = 1,
+ size = 12, hjust = 1))+
+coord_fixed()
+ggheatmap +
+geom_text(aes(Var2, Var1, label = value), color = "black", size = 4) +
+theme(
+ axis.title.x = element_blank(),
+ axis.title.y = element_blank(),
+ panel.grid.major = element_blank(),
+ panel.border = element_blank(),
+ panel.background = element_blank(),
+ axis.ticks = element_blank(),
+ legend.justification = c(1, 0),
+ legend.position = c(0.6, 0.7),
+ legend.direction = "horizontal")+
+ guides(fill = guide_colorbar(barwidth = 7, barheight = 1,
+ title.position = "top", title.hjust = 0.5))
+
+ ggheatmap
+
+```
+
+```{r}
+total_tenure <- subset(podaci, select = c(tenure,TotalCharges))
+total_tenure_bez_na <- na.omit(total_tenure)
+cor <- cor.test(total_tenure_bez_na$tenure, total_tenure_bez_na$TotalCharges, method = "pearson")
+cat("Pearsonov koeficijent korelacije tenure-TotalCharges: ", cor$estimate)
+
+```
+
+Analiza NA vrijednosti:
+
+Vidimo da se u navedenim kategorijama nalaze NA vrijednosti, što znači da imamo nedostajaćujih vrijednosti. U nastavku ćemo izvršiti analizu distribucije nedostajućih vrijednosti: <!-- -->
+
+```{r}
+#length(subset(podaci, {is.na(podaci$gender)})$MultipleLines)
+#length(subset(podaci, is.na(podaci$MultipleLines)))
+cat("Broj instanci dataseta: ", length(podaci$gender) , "\n",
+    #ovdje fali DailyCharges u subsetu jer je u chunku iznad izbacena ta kolona
+"Broj instanci sa NA vrijednostima u bilo kojoj koloni: ", length(subset(podaci, {is.na(gender) || is.na(Dependents) | is.na(tenure) | is.na(PhoneService) | is.na(MultipleLines) | is.na(InternetService) | is.na(StreamingTV) | is.na(StreamingMovies) | is.na(Contract) | is.na(PaymentMethod) | is.na(TotalCharges) | is.na(MonthlyCharges) | is.na(Churn)})$MultipleLines))
+
+```
+
+S obzirom da veliki broj instanci sadrži barem jednu nedostajuću vrijednost, neće biti adekvatno ignorisati te instance. Prvo je potrebno analizirati u kojim kolonama ima najviše nedefinisanih vrijednosti:
+
+```{r}
+library(VIM)
+aggr(podaci)
+podaci_stari <- podaci
+#svjesni smo da drugi grafik Combinations nije adekvatan, ali to je tehnicki nedostatak funkcije za crtanje zbog veceg broja kolona i prikaz ce biti bolji nakon izbacivanja nekoliko kolona
+```
+
+popunjavanje nedostajućih vrijednosti svih brojčanih kolona (tenure, monthlyCharges, dailyCharges, TotalCharges)
+
+```{r}
+#popunjavanje nedostajućih vrijednosti svih brojcanih kolona (tenure, monthlyCharges, dailyCharges, TotalCharges)
+#install.packages("tidyverse") https://www.codingprof.com/how-to-replace-missing-values-with-the-median-in-r/
+library(tidyverse)
+podaci <- podaci %>%
+mutate_if(is.numeric, function(x) ifelse(is.na(x), median(x, na.rm = T), x))
+```
+
+*mean*, *trimmed_mean* i *median* vrijednosti za (brojcane) varijable `tenure`, `DailyCharges`, `MonthlyCharges`, `TotalCharges`. *Trimmed_mean* izračunati koristeći sljedeće vrijednosti parametra p: 1, 2 i 4:
+
+```{r}
+trimmed_mean <- function(vektor,p)
+{
+ vektor <- sort(vektor)
+ trimmed_vektor <- vektor[(1 + p) : (length(vektor) - p)]
+ return (sum(trimmed_vektor) / length(trimmed_vektor))
+}
+
+cat("Mean za broj nekretnina koje mušterija posjeduje:", mean(podaci_brojcani_bez_na$tenure),"\n")
+cat("Trimmed_mean za broj nekretnina koje mušterija posjeduje (p=1):", trimmed_mean(podaci_brojcani_bez_na$tenure, 1),"\n")
+cat("Trimmed_mean za broj nekretnina koje mušterija posjeduje (p=2):", trimmed_mean(podaci_brojcani_bez_na$tenure, 2),"\n")
+cat("Trimmed_mean za broj nekretnina koje mušterija posjeduje (p=4):", trimmed_mean(podaci_brojcani_bez_na$tenure, 4),"\n")
+cat("Median za broj nekretnina koje mušterija posjeduje:", median(podaci$tenure), "\n\n")
+
+cat("Mean za dnevnu naplatu:", mean(podaci_brojcani_bez_na$DailyCharges),"\n")
+cat("Trimmed_mean za dnevnu naplatu (p=1):", trimmed_mean(podaci_brojcani_bez_na$DailyCharges, 1),"\n")
+cat("Trimmed_mean za dnevnu naplatu (p=2):", trimmed_mean(podaci_brojcani_bez_na$DailyCharges, 2),"\n")
+cat("Trimmed_mean za dnevnu naplatu (p=4):", trimmed_mean(podaci_brojcani_bez_na$DailyCharges, 4),"\n")
+cat("Median za dnevnu naplatu:", median(podaci_brojcani_bez_na$DailyCharges), "\n\n")
+
+ cat("Mean za mjesečnu naplatu:", mean(podaci$MonthlyCharges),"\n")
+ cat("Trimmed_mean za mjesečnu naplatu (p=1):", trimmed_mean(podaci$MonthlyCharges, 1),"\n")
+ cat("Trimmed_mean za mjesečnu naplatu (p=2):", trimmed_mean(podaci$MonthlyCharges, 2),"\n")
+ cat("Trimmed_mean za mjesečnu naplatu (p=4):", trimmed_mean(podaci$MonthlyCharges, 4),"\n")
+ cat("Median za mjesečnu naplatu:", median(podaci$MonthlyCharges), "\n\n")
+
+```
+
+```{r}
+head(podaci)
+```
+
+```{r}
+summary <- lapply(podaci, summary)
+summary
+num_cols <- subset(podaci, select = c(tenure, MonthlyCharges, TotalCharges)) 
+boxplots <- lapply(num_cols, boxplot)
+boxplots
+
+```
+
+```{r}
+#Provjera koje instance imaju vrijednost atributa Dependents Maybe, s obzirom da se na osnovu barplota iz početne analize dataseta može zaključiti da su to outlieri
+print(subset(podaci, Dependents == "Maybe"))
+```
+
+```{r}
+#Provjera koje instance imaju vrijednost atributa PaymentMethod abcd, s obzirom da se na osnovu barplota može zaključiti da su to outlieri
+print(subset(podaci, PaymentMethod == "abcd"))
+```
+
+Možemo napraviti i barplot za atribute tenure, s obzirom da ima diskretne vrijednosti:
+
+```{r}
+barplot(table(podaci$tenure),
+main="Broj klijenata po zakupu",
+ylim= c(0, length(podaci$tenure)/5),
+xlab="Zakup",
+ylab="Broj",
+border="red",
+col="blue",
+density=10
+)
+```
+
+Vidimo da veoma malo klijenata nema prostore pod zakupom, pa tražimo takve instance:
+
+```{r}
+print(subset(podaci, tenure == 0))
+```
+
+Izbacujemo outliere sa imenima redova koje smo pronašli u prethodnih nekoliko linija koda:
+
+```{r}
+#izbacivanje outliera
+podaci <- podaci[!rownames(podaci) %in% c("550", "70", "76","1632"), ]
+```
+
+```{r}
+#izbacivanje outliera numeričkih atributa
+
+plot(podaci$MonthlyCharges, podaci$tenure)
+
+```
+
+```{r}
+#outlier 
+index_minimuma <- which.min(podaci$MonthlyCharges)
+podaci <- subset(podaci, MonthlyCharges>0)
+plot(podaci$MonthlyCharges, podaci$tenure)
+```
+
+```{r}
+#korelacija kategoričkih varijabli
+chi_matrica <- matrix(0,ncol(podaci), ncol(podaci))
+rownames(chi_matrica) <- colnames(podaci)
+colnames(chi_matrica) <- colnames(podaci)
+critical_matrica <- matrix(0,ncol(podaci), ncol(podaci))
+rownames(critical_matrica) <- colnames(podaci)
+colnames(critical_matrica) <- colnames(podaci)
+razlika_matrica <- matrix(0,ncol(podaci), ncol(podaci))
+rownames(razlika_matrica) <- colnames(podaci)
+colnames(razlika_matrica) <- colnames(podaci)
+for (k in colnames(podaci)){
+  atribut1 <- sort(unique(podaci[[k]]))
+  for (l in colnames(podaci)){
+    atribut2 <- sort(unique(podaci[[l]]))
+   if(class(podaci[[k]]) == "character" & class(podaci[[l]]) == "character"){
+        data2 <- matrix(0, length(atribut1), length(atribut2))
+        rownames(data2) <- atribut1
+        colnames(data2) <- atribut2
+        cat("\nMatrica korelacije atributa ", colnames(podaci[k]), " i ", colnames(podaci[l]), ":\n\n")
+            for (i in 1 : length(atribut1)) {
+
+                for (j in 1 : length(atribut2)) {
+  
+                    redovi <- subset(podaci, (podaci[[k]] == atribut1[i] & podaci[[l]] == atribut2[j]))
+                    data2[i, j] = length(redovi[[k]])
+                }
+            }
+      print(data2)
+      chi <- chisq.test(data2)
+      chi_matrica[k,l] <- chi$statistic
+      critical <- qchisq(p = chi$p.value, df = chi$parameter)
+      critical_matrica[k,l] <- critical
+      if(chi$statistic - critical >0){
+      razlika_matrica[k,l] <- chi_matrica[k,l] - critical
+      }
+   }
+  }
+}
+cat("Chi matrica:\n\n")
+print(chi_matrica)
+cat("Matrica krticnih vrijednosti:\n\n")
+print(critical_matrica)
+cat("Matrica razlike chi matrice i kriticnih vrijednosti:\n\n")
+#print(razlika_matrica)
+razlika_matrica <- razlika_matrica[,!colnames(razlika_matrica) %in% c("DailyCharges", "tenure", "MonthlyCharges", "TotalCharges")]
+razlika_matrica <- razlika_matrica[!rownames(razlika_matrica) %in% c("DailyCharges", "tenure", "MonthlyCharges", "TotalCharges"),]
+print(razlika_matrica)
+razlika.df <- as.data.frame(t(razlika_matrica))
+print(razlika.df)
+normalize <- function(x) {
+return (round((x - min(x)) / (max(x) - min(x)),2))
+}
+for (i in colnames(razlika.df)){
+razlika.df[[i]]<-normalize(razlika.df[[i]])
+}
+print(razlika.df)
+razlika_matrica <- as.matrix(razlika.df)
+print(razlika_matrica)
+```
+
+```{r}
+
+library(reshape2)
+library(ggplot2)
+# funkcija za odsijecanje gornjeg dijela matrice
+get_upper_tri <- function(cormat){
+ cormat[lower.tri(cormat)]<- NA
+ return(cormat)
+}
+upper_tri <- get_upper_tri(razlika_matrica)
+melted_cormat <- melt(upper_tri, na.rm = TRUE)
+
+ggheatmap <- ggplot(data = melted_cormat, aes(Var2, Var1, fill = value))+
+geom_tile(color = "white")+
+scale_fill_gradient2(low = "blue", high = "red", mid = "white",
+ midpoint = 0.5, limit = c(0,1), space = "Lab",
+ name="Chi-square\nCorrelation") +
+ theme_minimal()+
+theme(axis.text.x = element_text(angle = 45, vjust = 1,
+ size = 12, hjust = 1))+
+coord_fixed()
+ggheatmap +
+geom_text(aes(Var2, Var1, label = value), color = "black", size = 4) +
+theme(
+ axis.title.x = element_blank(),
+ axis.title.y = element_blank(),
+ panel.grid.major = element_blank(),
+ panel.border = element_blank(),
+ panel.background = element_blank(),
+ axis.ticks = element_blank(),
+ legend.justification = c(1, 0),
+ legend.position = c(0.6, 0.7),
+ legend.direction = "horizontal")+
+ guides(fill = guide_colorbar(barwidth = 7, barheight = 1,
+ title.position = "top", title.hjust = 0.5))
+
+ ggheatmap
+```
+
+```{r}
+
+podaci_stari <- podaci
+#podaci <- subset(podaci, select = -c(MultipleLines, StreamingMovies, InternetService, TotalCharges))
+podaci <- subset(podaci, select = -c(MultipleLines, StreamingMovies, TotalCharges))
+
+```
+
+Analiza NA vrijednosti nakon izbacivanja kolona:
+
+```{r}
+library(VIM)
+aggr(podaci)
+cat(nrow(podaci[podaci$Churn == "Yes", ]), " mušterija iz dataseta je otkazalo pretplatu\n",
+nrow(podaci[podaci$Churn == "No", ]), " mušterija iz dataseta nije otkazalo pretplatu.\n", "Broj instanci sa NA vrijednostima u koloni Churn: ", nrow(podaci[is.na(podaci$Churn),]))
+
+```
+
+Popunjavanje NA vrijednosti kategoričkih atributa:
+
+```{r}
+male<-0
+dependent<-0
+for (i in 1 : length(podaci$gender)) 
+{ 
+   #popunjavanje NA vrijednosti za InternetService ako je u StreamingMOvies No internet service
+   # if (is.na(podaci$InternetService[i]) == TRUE & is.na(podaci_stari$StreamingMovies[i]) == FALSE & podaci_stari$StreamingMovies[i]=="No internet service")
+   # {
+   #   podaci$InternetService[i] <- "No"
+   # }
+   
+  #popunjavanje NA vrijednosti za InternetService ako je u StreamingTV No internet service
+  #  if (is.na(podaci$InternetService[i]) == TRUE & is.na(podaci$StreamingTV[i]) == FALSE & podaci$StreamingTV[i]=="No internet service")
+  # {
+  #    podaci$InternetService[i] <- "No"
+  # }
+  #popunjavanje StreamingTV na No internet service ako je InternetService No
+  if (is.na(podaci$StreamingTV[i]) == TRUE & is.na(podaci_stari$InternetService[i]) == FALSE & podaci_stari$InternetService[i]=="No")
+  {
+    podaci$StreamingTV[i] <- "No internet service"
+  }
+  #popunjavanje PhoneService na Yes ako je MultipleLines yes
+  if (is.na(podaci$PhoneService[i]) == TRUE & is.na(podaci_stari$MultipleLines[i]) == FALSE & podaci_stari$MultipleLines[i]=="Yes")
+  {
+    podaci$PhoneService[i] <- "Yes"
+  }
+  #popunjavanje InternetService na DSL ako je Phone Service No
+  # if (is.na(podaci$PhoneService[i]) == FALSE  & podaci$PhoneService[i]=="No" & is.na(podaci$InternetService[i]))
+  # {
+  #    podaci$InternetService[i] <- "DSL"
+  # }
+  if (is.na(podaci_stari$MultipleLines[i]) == FALSE  & podaci_stari$MultipleLines[i]=="No phone service" & is.na(podaci$PhoneService[i]))
+  {
+     podaci$PhoneService[i] <- "No"
+  }
+   if (is.na(podaci$gender[i]) == TRUE)
+  {
+     if (male == 1){
+      podaci$gender[i] <- "Male"
+      male<-0
+     } else {
+        podaci$gender[i] <- "Female"
+        male<-1
+     }
+   }
+  
+  # if (is.na(podaci$gender[i]) == TRUE)
+  # {
+  #   podaci$gender[i] <- "Male"
+  #}
+    if (is.na(podaci$Dependents[i]) == TRUE) 
+   { 
+      if (dependent == 1){
+       podaci$Dependents[i] <- "No"
+       dependent<-0
+     } else {
+        podaci$Dependents[i] <- "Yes"
+        dependent<-1
+     }
+   }
+
+  #ako su InternetService i StreamingTV i StreamingMovies svi Na
+  if (is.na(podaci_stari$InternetService[i]) == TRUE & is.na(podaci$StreamingTV[i])==TRUE & is.na(podaci_stari$StreamingMovies[i])==TRUE){
+    #podaci$InternetService[i]<-'No'
+    podaci$StreamingTV[i]<-'No internet service'
+  }
+  #ako su InternetService i StreamingTV Na i StreamingMovies No
+  if (is.na(podaci_stari$InternetService[i]) == TRUE & is.na(podaci$StreamingTV[i])==TRUE & podaci_stari$StreamingMovies[i]=='No'){
+    #podaci$InternetService[i]<-'No'
+    podaci$StreamingTV[i]<-'No internet service'
+  }
+  # #ako su InternetService i StreamingMovies Na i StreamingTV No
+  # if (is.na(podaci$InternetService[i]) == TRUE & is.na(podaci_stari$StreamingMovies[i])==TRUE & podaci$StreamingTV[i]=='No'){
+  #    podaci$InternetService[i]<-'No'
+  #    #podaci$StreamingMovies[i]<-'No internet service'
+  # }
+  #  if (is.na(podaci$InternetService[i]) == TRUE){
+  #    podaci$InternetService[i]<-'DSL'
+  # }
+  if (is.na(podaci$PhoneService[i]) == TRUE){
+    podaci$PhoneService[i]<-'Yes'
+  }
+  if (is.na(podaci$StreamingTV[i]) == TRUE){
+    podaci$StreamingTV[i]<-'Yes'
+  }
+  if (is.na(podaci$Contract[i]) == TRUE){
+    podaci$Contract[i]<-'Month-to-month'
+  }
+  if (is.na(podaci$PaymentMethod[i]) == TRUE){
+    podaci$PaymentMethod[i]<-'Electronic check'
+  }
+}
+
+```
+
+```{r}
+#Normalizacija podataka
+
+#MIn-max normalizacija
+podaci_bez_normalizacije <- podaci
+plot(podaci$tenure, podaci$MonthlyCharges, main = "Scatterplot bez 
+normalizacije", bg = "blue", pch = 21)
+
+max <- max(podaci$MonthlyCharges)
+min <- min(podaci$MonthlyCharges)
+podaci <- mutate(podaci, MonthlyCharges = (MonthlyCharges - min) / (max -
+min))
+
+
+plot(podaci$tenure, podaci$MonthlyCharges, main = "Min-max
+normalizacija", bg = "blue", pch = 21)
+
+```
+
+Prije izgradnje modela, izbacit ćemo instance koje nemaju definisan churn, odnosno takve instance nam ne mogu poslužiti za treniranje modela, već samo za testiranje.
+
+```{r}
+podaci_stari <- podaci
+podaci <- subset(podaci, is.na(podaci$Churn)=='FALSE')
+```
+
+## **Zadatak 2** (Izgradnja modela klasifikacije)
+
+### a)
+
+Izgraditi sljedeće modele klasifikacije:
+
+-   drvo odlučivanja koje kao mjeru atributa selekcije koristi informacijsku dobit;
+
+-   drvo odlučivanja koje kao mjeru atributa selekcije koristi gini indeks;
+
+-   C5.0 model klasifikacije.
+
+Izgradnju modela vršiti na sljedeći način: Prije izgradnje predikcijskih modela, na osnovu analize podataka potrebno je izvršiti sve potrebne korake preprocesiranja podataka (zadatak 1). Ovaj proces je potrebno dokumentovati na način da se prikažu poduzeti koraci, kao i da se daju objašnjenja i razlozi poduzimanja tih koraka. Zatim je potrebno izgraditi navedene klasifikacijske modele, dokumentovati i proces treniranja i testiranja modela, kao i rezultate evaluacije. Izvršiti čiščenje stabla za one modele za koje je to moguće. Ovaj korak se radi iterativno dok se ne dobiju rezultati za koje smatrate da su prihvatljivi.
+
+Evaluacija istreniranih klasifikatora se vrši koristeći sljedeće metrike:
+
+-   konfuzijska matrica i mjere procjene koje se izvode na osnovu konfuzijske matrice (tačnost, osjetljivost, opoziv, F-mjera, itd.);
+
+-   ROC kriva;
+
+-   kappa statistika.
+
+```{r}
+draw_confusion_matrix <- function(cm)
+{
+ columns <- colnames(cm$table)
+ rows <- rownames(cm$table)
+ layout(matrix(c(1,1,2)))
+ par(mar=c(2,2,2,2))
+ plot(c(100, 345), c(300, 450), type = "n", xlab="", ylab="", xaxt='n',
+yaxt='n')
+ title('CONFUSION MATRIX', cex.main=2)
+ rect(150, 430, 240, 370, col='#3F97D0')
+ text(195, 435, columns[1], cex=1.2)
+ rect(250, 430, 340, 370, col='#F7AD50')
+ text(295, 435, columns[2], cex=1.2)
+ text(125, 370, 'Predicted', cex=1.3, srt=90, font=2)
+ text(245, 450, 'Actual', cex=1.3, font=2)
+ rect(150, 305, 240, 365, col='#F7AD50')
+ rect(250, 305, 340, 365, col='#3F97D0')
+ text(140, 400, rows[1], cex=1.2, srt=90)
+ text(140, 335, rows[2], cex=1.2, srt=90)
+ res <- as.numeric(cm$table)
+ text(195, 400, res[1], cex=1.6, font=2, col='white')
+ text(195, 335, res[2], cex=1.6, font=2, col='white')
+ text(295, 400, res[3], cex=1.6, font=2, col='white')
+ text(295, 335, res[4], cex=1.6, font=2, col='white')
+ plot(c(100, 0), c(100, 0), type = "n", xlab="", ylab="", main =
+"DETAILS", xaxt='n', yaxt='n')
+ text(10, 85, names(cm$byClass[1]), cex=1.2, font=2)
+ text(10, 70, round(as.numeric(cm$byClass[1]), 3), cex=1.2)
+ text(30, 85, names(cm$byClass[2]), cex=1.2, font=2)
+ text(30, 70, round(as.numeric(cm$byClass[2]), 3), cex=1.2)
+ text(50, 85, names(cm$byClass[5]), cex=1.2, font=2)
+ text(50, 70, round(as.numeric(cm$byClass[5]), 3), cex=1.2)
+ text(70, 85, names(cm$byClass[6]), cex=1.2, font=2)
+ text(70, 70, round(as.numeric(cm$byClass[6]), 3), cex=1.2)
+ text(90, 85, names(cm$byClass[7]), cex=1.2, font=2)
+ text(90, 70, round(as.numeric(cm$byClass[7]), 3), cex=1.2)
+ text(30, 35, names(cm$overall[1]), cex=1.5, font=2)
+ text(30, 20, round(as.numeric(cm$overall[1]), 3), cex=1.4)
+ text(70, 35, names(cm$overall[2]), cex=1.5, font=2)
+ text(70, 20, round(as.numeric(cm$overall[2]), 3), cex=1.4)
+}
+
+```
+
+Faktorizacija:
+
+```{r}
+#faktorizacija kategorickih varijabli
+podaci$gender <- factor(podaci$gender)
+podaci$Dependents <- factor(podaci$Dependents)
+podaci$PhoneService <- factor(podaci$PhoneService)
+#podaci$MultipleLines <- factor(podaci$MultipleLines)
+#podaci$InternetService <- factor(podaci$InternetService)
+#podaci$StreamingMovies <- factor(podaci$StreamingMovies)
+podaci$StreamingTV <- factor(podaci$StreamingTV)
+podaci$Contract <- factor(podaci$Contract)
+podaci$PaymentMethod <- factor(podaci$PaymentMethod)
+podaci$Churn <- factor(podaci$Churn)
+
+#podjela skupa na trening i testni skup
+end <- length(podaci$Churn)
+n <- as.integer(0.85 * end)
+podaci_train <- podaci[1 : n, ]
+podaci_test <- podaci[(n + 1) : end, ]
+```
+
+```{r}
+#informacijska dobit
+
+
+#kreiranje stabla odlucivanja
+library(rpart)
+tree_information <- rpart(formula = Churn ~ .,
+ method = "class",
+ data = podaci_train,
+ parms = list(split = "information"))
+
+#crtanje stabla odlucivanja
+library(rpart.plot)
+rpart.plot(tree_information)
+
+#kreiranje konfuzijske matrice
+library(caret)
+prediction <- predict(tree_information, newdata = subset(podaci_test, select = -
+c(Churn)))
+prediction<-prediction[,1]
+class_prediction <-ifelse(prediction > 0.50,"No","Yes")
+class_prediction<-factor(class_prediction, levels=levels(podaci_test$Churn))
+
+cm<-confusionMatrix(data=class_prediction, reference = podaci_test$Churn)
+draw_confusion_matrix(cm)
+
+#odredjivanje cp
+plotcp(tree_information)
+
+#smanjenje broja cvorova
+pruned_tree_information<-prune(tree_information, cp = 0.012)
+rpart.plot(pruned_tree_information)
+
+#kreiranje konfuzijske matrice za novo stablo
+library(caret)
+prediction <- predict(pruned_tree_information, newdata = subset(podaci_test, select = -c(Churn)))
+prediction<-prediction[,1]
+class_prediction <-ifelse(prediction > 0.50,"No","Yes")
+class_prediction<-factor(class_prediction, levels=levels(podaci_test$Churn))
+
+cm<-confusionMatrix(data=class_prediction, reference = podaci_test$Churn)
+draw_confusion_matrix(cm)
+
+```
+
+```{r}
+#gini kriterij
+
+
+#kreiranje stabla odlucivanja
+tree_gain <- rpart(formula = Churn ~ .,
+method = "class",
+data = podaci_train)
+
+#crtanje stabla odlucivanja
+rpart.plot(tree_gain)
+
+#kreiranje konfuzijske matrice
+prediction_gain <- predict(tree_gain, newdata = subset(podaci_test, select = -
+c(Churn)))
+prediction_gain<-prediction_gain[,1]
+class_prediction <-ifelse(prediction > 0.50,"No","Yes")
+class_prediction<-factor(class_prediction, levels=levels(podaci_test$Churn))
+
+cm_gain<-confusionMatrix(data=class_prediction, reference = podaci_test$Churn)
+
+draw_confusion_matrix(cm_gain)
+
+#odredjivanje cp
+plotcp(tree_gain)
+
+#smanjenje broja cvorova
+pruned_tree_gain<-prune(tree_gain, cp = 0.031)
+rpart.plot(pruned_tree_gain)
+
+#kreiranje nove konfuzijske matrice
+prediction_gain <- predict(pruned_tree_gain, newdata = subset(podaci_test, select = -c(Churn)))
+prediction_gain<-prediction_gain[,1]
+class_prediction <-ifelse(prediction > 0.50,"No","Yes")
+class_prediction<-factor(class_prediction, levels=levels(podaci_test$Churn))
+
+cm_gain<-confusionMatrix(data=class_prediction, reference = podaci_test$Churn)
+
+draw_confusion_matrix(cm_gain)
+
+```
+
+```{r}
+#C5.0 model klasifikacije
+#install.packages(C50)
+library(C50)
+library(caret)
+
+tree_C5 <- C5.0(x = subset(podaci_train, select = -c(Churn)), y =
+podaci_train$Churn)
+predictions <- predict(tree_C5, newdata = subset(podaci_test, select = -
+c(Churn)))
+
+cm_initial <- confusionMatrix(data = predictions, reference = podaci_test$Churn, positive = 'Yes')
+
+draw_confusion_matrix(cm_initial)
+
+
+```
+
+### b)
+
+Implementirati predikcijske modele pod a) sa metodama:
+
+-   holdouta sa različitim podjelama na trening i testni podskup podataka;
+-   \- k-fold unakrsne validacije sa različitim vrijednostima parametra k;
+-   k-fold bootstrapinga sa različitim vrijednostima parametra k.
+
+Analizirati koja je metoda je dala najbolja poboljšanja performansi klasifikatora.
+
+```{r}
+#holdout sa informacijskom dobiti
+set.seed(2222)
+rows <- sample(nrow(podaci))
+podaci <- podaci[rows, ]
+
+end <- length(podaci$Churn)
+n <- as.integer(0.85 * end)
+podaci_train <- podaci[1 : n, ]
+podaci_test <- podaci[(n + 1) : end, ]
+
+
+tree <- rpart(formula = Churn ~ .,
+ method = "class",
+ data = podaci_train,
+ control = rpart.control("minsplit" = 1),
+ parms = list(split = "information"))
+
+
+tree
+rpart.plot(tree)
+
+prediction <- predict(tree, podaci_test)
+prediction
+
+prediction <- predict(tree, newdata = subset(podaci_test, select = -
+c(Churn)))
+prediction
+for (i in 1 : nrow(prediction))
+{
+ predviđena <- "No"
+ if (prediction[i][1] == 1)
+ predviđena <- "Yes"
+ stvarna <- levels(podaci_test$Churn)[podaci_test$Churn[i]]
+ cat("Predviđena vrijednost:", predviđena, "Stvarna vrijednost:",
+stvarna, "\n")
+}
+
+prediction <- predict(tree, newdata = subset(podaci_test, select = -
+c(Churn)))
+prediction<-prediction[,1]
+class_prediction <-ifelse(prediction > 0.50,"No","Yes")
+class_prediction<-factor(class_prediction, levels=levels(podaci_test$Churn))
+cm_gain<-confusionMatrix(data=class_prediction, reference = podaci_test$Churn)
+
+draw_confusion_matrix(cm_gain)
+
+
+
+```
+
+```{r}
+#Holdout sa gini indeks
+set.seed(2222)
+rows <- sample(nrow(podaci))
+podaci <- podaci[rows, ]
+
+end <- length(podaci$Churn)
+n <- as.integer(0.85 * end)
+podaci_train <- podaci[1 : n, ]
+podaci_test <- podaci[(n + 1) : end, ]
+
+
+tree <- rpart(formula = Churn ~ .,
+ method = "class",
+ data = podaci_train,
+ control = rpart.control("minsplit" = 1))
+
+
+tree
+rpart.plot(tree)
+
+prediction <- predict(tree, podaci_test)
+prediction
+
+prediction <- predict(tree, newdata = subset(podaci_test, select = -
+c(Churn)))
+prediction
+for (i in 1 : nrow(prediction))
+{
+ predviđena <- "No"
+ if (prediction[i][1] == 1)
+ predviđena <- "Yes"
+ stvarna <- levels(podaci_test$Churn)[podaci_test$Churn[i]]
+ cat("Predviđena vrijednost:", predviđena, "Stvarna vrijednost:",stvarna, "\n")
+}
+
+prediction <- predict(tree, newdata = subset(podaci_test, select = -
+c(Churn)))
+prediction<-prediction[,1]
+class_prediction <-ifelse(prediction > 0.50,"No","Yes")
+class_prediction<-factor(class_prediction, levels=levels(podaci_test$Churn))
+cm_gain<-confusionMatrix(data=class_prediction, reference = podaci_test$Churn)
+
+draw_confusion_matrix(cm_gain)
+
+```
+
+```{r}
+
+#Holdout C5
+set.seed(2222)
+rows <- sample(nrow(podaci))
+podaci <- podaci[rows, ]
+
+end <- length(podaci$Churn)
+n <- as.integer(0.6 * end)
+podaci_train <- podaci[1 : n, ]
+podaci_test <- podaci[(n + 1) : end, ]
+
+tree_C5 <- C5.0(x = subset(podaci_train, select = -c(Churn)), y =podaci_train$Churn)
+predictions <- predict(tree_C5, newdata = subset(podaci_test, select = -c(Churn)))
+cm_initial <- confusionMatrix(data = predictions, reference = podaci_test$Churn)
+cm_initial
+```
+
+```{r}
+#k-fold informacijska dobit
+library(plyr)
+kfold <- function(podaci, k)
+{
+ folds <- split(podaci, cut(sample(1 : nrow(podaci)), k))
+ acc <- rep(NA, length(folds))
+ kappa <- rep(NA, length(folds))
+
+ for (i in 1:length(folds))
+ {
+ test <- subset(ldply(folds[i], data.frame), select = -c(.id))
+ train <- subset(ldply(folds[-i], data.frame), select = -c(.id))
+ tree_gain <- rpart(formula = Churn ~ .,
+ method = "class",
+ data = podaci_train,
+ control = rpart.control("minsplit" = 1),
+ parms = list(split = "information"))
+
+  prediction <- predict(tree, newdata = subset(test, select = -c(Churn)))
+ 
+ 
+ prediction <- prediction[, 1]
+ class_prediction <-
+    ifelse(prediction > 0.50,
+      "No",
+      "Yes"
+ )
+ class_prediction <- factor(class_prediction)
+    
+ cm <- confusionMatrix(data = class_prediction, reference =test$Churn)
+ acc[i] <- cm$overall[1]
+ kappa[i] <- cm$overall[2]
+ }
+ list <- list("acc" = acc, "kappa" = kappa)
+ return (list)
+}
+
+list <- kfold(podaci, 10)
+acc <- list$acc
+kappa <- list$kappa
+cat("10-fold validacija\n")
+cat("Najveća tačnost:", max(acc), ", fold:", which.max(acc))
+cat(", najveća kappa:", max(kappa), ", fold:", which.max(kappa), "\n")
+cat("Najmanja tačnost:", min(acc), ", fold:", which.min(acc))
+cat(", najmanja kappa:", min(kappa), ", fold:", which.min(kappa), "\n")
+cat("Srednja tačnost:", sum(acc) / length(acc))
+cat(", srednja kappa:", sum(kappa) / length(kappa), "\n\n")
+list <- kfold(podaci, 5)
+acc <- list$acc
+kappa <- list$kappa
+cat("5-fold validacija\n")
+cat("Najveća tačnost:", max(acc), ", fold:", which.max(acc))
+cat(", najveća kappa:", max(kappa), ", fold:", which.max(kappa), "\n")
+cat("Najmanja tačnost:", min(acc), ", fold:", which.min(acc))
+cat(", najmanja kappa:", min(kappa), ", fold:", which.min(kappa), "\n")
+cat("Srednja tačnost:", sum(acc) / length(acc))
+cat(", srednja kappa:", sum(kappa) / length(kappa), "\n\n")
+
+```
+
+```{r}
+#kfold gini indeks
+kfold2 <- function(podaci, k)
+{
+ folds <- split(podaci, cut(sample(1 : nrow(podaci)), k))
+ acc <- rep(NA, length(folds))
+ kappa <- rep(NA, length(folds))
+
+ for (i in 1:length(folds))
+ {
+ test <- subset(ldply(folds[i], data.frame), select = -c(.id))
+ train <- subset(ldply(folds[-i], data.frame), select = -c(.id))
+ tree_gain <- rpart(formula = Churn ~ .,
+ method = "class",
+ data = podaci_train,
+ control = rpart.control("minsplit" = 1))
+
+ prediction <- predict(tree, newdata = subset(test, select = -c(Churn)))
+ 
+ prediction <- prediction[, 1]
+      class_prediction <-
+        ifelse(prediction > 0.50,
+          "No",
+          "Yes"
+      )
+  class_prediction <- factor(class_prediction)
+  library(caret)
+  cm <- confusionMatrix(data = class_prediction, reference =test$Churn)
+ acc[i] <- cm$overall[1]
+ kappa[i] <- cm$overall[2]
+ }
+ list <- list("acc" = acc, "kappa" = kappa)
+ return (list)
+}
+
+list <- kfold2(podaci, 10)
+acc <- list$acc
+kappa <- list$kappa
+cat("10-fold validacija\n")
+cat("Najveća tačnost:", max(acc), ", fold:", which.max(acc))
+cat(", najveća kappa:", max(kappa), ", fold:", which.max(kappa), "\n")
+cat("Najmanja tačnost:", min(acc), ", fold:", which.min(acc))
+cat(", najmanja kappa:", min(kappa), ", fold:", which.min(kappa), "\n")
+cat("Srednja tačnost:", sum(acc) / length(acc))
+cat(", srednja kappa:", sum(kappa) / length(kappa), "\n\n")
+list <- kfold2(podaci, 5)
+acc <- list$acc
+kappa <- list$kappa
+cat("5-fold validacija\n")
+cat("Najveća tačnost:", max(acc), ", fold:", which.max(acc))
+cat(", najveća kappa:", max(kappa), ", fold:", which.max(kappa), "\n")
+cat("Najmanja tačnost:", min(acc), ", fold:", which.min(acc))
+cat(", najmanja kappa:", min(kappa), ", fold:", which.min(kappa), "\n")
+cat("Srednja tačnost:", sum(acc) / length(acc))
+cat(", srednja kappa:", sum(kappa) / length(kappa), "\n\n")
+
+```
+
+```{r}
+#k fold C5
+kfold3 <- function(podaci, k)
+{
+ folds <- split(podaci, cut(sample(1 : nrow(podaci)), k))
+ acc <- rep(NA, length(folds))
+ kappa <- rep(NA, length(folds))
+
+ for (i in 1:length(folds))
+ {
+ test <- subset(ldply(folds[i], data.frame), select = -c(.id))
+ train <- subset(ldply(folds[-i], data.frame), select = -c(.id))
+ tree <- C5.0(x = subset(train, select = -c(Churn)), y =
+train$Churn)
+ predictions <- predict(tree, newdata = subset(test, select = -
+c(Churn)))
+ cm <- confusionMatrix(data = predictions, reference = test$Churn)
+ acc[i] <- cm$overall[1]
+ kappa[i] <- cm$overall[2]
+ }
+ list <- list("acc" = acc, "kappa" = kappa)
+ return (list)
+}
+
+list <- kfold3(podaci, 10)
+acc <- list$acc
+kappa <- list$kappa
+cat("10-fold validacija\n")
+cat("Najveća tačnost:", max(acc), ", fold:", which.max(acc))
+cat(", najveća kappa:", max(kappa), ", fold:", which.max(kappa), "\n")
+cat("Najmanja tačnost:", min(acc), ", fold:", which.min(acc))
+cat(", najmanja kappa:", min(kappa), ", fold:", which.min(kappa), "\n")
+cat("Srednja tačnost:", sum(acc) / length(acc))
+cat(", srednja kappa:", sum(kappa) / length(kappa), "\n\n")
+list <- kfold3(podaci, 5)
+acc <- list$acc
+kappa <- list$kappa
+cat("5-fold validacija\n")
+cat("Najveća tačnost:", max(acc), ", fold:", which.max(acc))
+cat(", najveća kappa:", max(kappa), ", fold:", which.max(kappa), "\n")
+cat("Najmanja tačnost:", min(acc), ", fold:", which.min(acc))
+cat(", najmanja kappa:", min(kappa), ", fold:", which.min(kappa), "\n")
+cat("Srednja tačnost:", sum(acc) / length(acc))
+cat(", srednja kappa:", sum(kappa) / length(kappa), "\n\n")
+
+```
+
+```{r}
+#k-fold bootstraping informacijska dobit
+bootstrap <- function(podaci, k)
+{
+  acc <- rep(NA, k)
+  kappa <- rep(NA, k)
+  B <- as.integer(length(podaci$Churn) / k)
+  for (i in 1:k)
+  {
+   test <- podaci[sample(nrow(podaci), size = B), ]
+   train <- podaci[sample(nrow(podaci), size = length(podaci$Churn) -B), ]
+   tree_gain <- rpart(formula = Churn ~ .,
+   method = "class",
+   data = train,
+   control = rpart.control("minsplit" = 1),
+   parms = list(split = "information"))
+ 
+ prediction <- predict(tree, newdata = subset(test, select = -c(Churn)))
+ 
+ 
+ prediction <- prediction[, 1]
+      class_prediction <-
+        ifelse(prediction > 0.50,
+          "No",
+          "Yes"
+      )
+      class_prediction <- factor(class_prediction)
+      library(caret)
+      cm <- confusionMatrix(data = class_prediction, reference =test$Churn)
+   acc[i] <- cm$overall[1]
+   kappa[i] <- cm$overall[2]
+ }
+ list <- list("acc" = acc, "kappa" = kappa)
+ return (list)
+}
+
+list <- bootstrap(podaci, 10)
+acc <- list$acc
+kappa <- list$kappa
+cat("10-fold bootstrap\n")
+cat("Najveća tačnost:", max(acc), ", fold:", which.max(acc))
+cat(", najveća kappa:", max(kappa), ", fold:", which.max(kappa), "\n")
+cat("Najmanja tačnost:", min(acc), ", fold:", which.min(acc))
+cat(", najmanja kappa:", min(kappa), ", fold:", which.min(kappa), "\n")
+cat("Srednja tačnost:", sum(acc) / length(acc))
+cat(", srednja kappa:", sum(kappa) / length(kappa), "\n\n")
+list <- bootstrap(podaci, 5)
+acc <- list$acc
+kappa <- list$kappa
+cat("5-fold bootstrap\n")
+cat("Najveća tačnost:", max(acc), ", fold:", which.max(acc))
+cat(", najveća kappa:", max(kappa), ", fold:", which.max(kappa), "\n")
+cat("Najmanja tačnost:", min(acc), ", fold:", which.min(acc))
+cat(", najmanja kappa:", min(kappa), ", fold:", which.min(kappa), "\n")
+cat("Srednja tačnost:", sum(acc) / length(acc))
+cat(", srednja kappa:", sum(kappa) / length(kappa), "\n\n")
+
+
+```
+
+```{r}
+#k-fold bootstraping gini indeks
+bootstrap2 <- function(podaci, k)
+{
+  acc <- rep(NA, k)
+  kappa <- rep(NA, k)
+  B <- as.integer(length(podaci$Churn) / k)
+  for (i in 1:k)
+  {
+   test <- podaci[sample(nrow(podaci), size = B), ]
+   train <- podaci[sample(nrow(podaci), size = length(podaci$Churn) -B), ]
+   tree_gain <- rpart(formula = Churn ~ .,
+   method = "class",
+   data = train,
+   control = rpart.control("minsplit" = 1))
+
+ prediction <- predict(tree, newdata = subset(test, select = -c(Churn)))
+ 
+prediction <- prediction[, 1]
+      class_prediction <-
+        ifelse(prediction > 0.50,
+          "No",
+          "Yes"
+      )
+      class_prediction <- factor(class_prediction)
+      library(caret)
+      cm <- confusionMatrix(data = class_prediction, reference =test$Churn)
+   acc[i] <- cm$overall[1]
+   kappa[i] <- cm$overall[2]
+  }
+
+ list <- list("acc" = acc, "kappa" = kappa)
+ return (list)
+}
+
+list <- bootstrap2(podaci, 10)
+acc <- list$acc
+kappa <- list$kappa
+cat("10-fold bootstrap\n")
+cat("Najveća tačnost:", max(acc), ", fold:", which.max(acc))
+cat(", najveća kappa:", max(kappa), ", fold:", which.max(kappa), "\n")
+cat("Najmanja tačnost:", min(acc), ", fold:", which.min(acc))
+cat(", najmanja kappa:", min(kappa), ", fold:", which.min(kappa), "\n")
+cat("Srednja tačnost:", sum(acc) / length(acc))
+cat(", srednja kappa:", sum(kappa) / length(kappa), "\n\n")
+list <- bootstrap2(podaci, 5)
+acc <- list$acc
+kappa <- list$kappa
+cat("5-fold bootstrap\n")
+cat("Najveća tačnost:", max(acc), ", fold:", which.max(acc))
+cat(", najveća kappa:", max(kappa), ", fold:", which.max(kappa), "\n")
+cat("Najmanja tačnost:", min(acc), ", fold:", which.min(acc))
+cat(", najmanja kappa:", min(kappa), ", fold:", which.min(kappa), "\n")
+cat("Srednja tačnost:", sum(acc) / length(acc))
+cat(", srednja kappa:", sum(kappa) / length(kappa), "\n\n")
+
+```
+
+```{r}
+#k-fold bootstraping C5
+bootstrap3 <- function(podaci, k)
+{
+  acc <- rep(NA, k)
+  kappa <- rep(NA, k)
+  B <- as.integer(length(podaci$Churn) / k)
+  for (i in 1:k)
+  {
+   test <- podaci[sample(nrow(podaci), size = B), ]
+   train <- podaci[sample(nrow(podaci), size = length(podaci$Churn) -B), ]
+   tree <- C5.0(x = subset(train, select = -c(Churn)), y =train$Churn)
+   predictions <- predict(tree, newdata = subset(test, select = -c(Churn)))
+   cm <- confusionMatrix(data = predictions, reference = test$Churn)
+   acc[i] <- cm$overall[1]
+   kappa[i] <- cm$overall[2]
+ }
+ list <- list("acc" = acc, "kappa" = kappa)
+ return (list)
+}
+
+list <- bootstrap3(podaci, 10)
+acc <- list$acc
+kappa <- list$kappa
+cat("10-fold bootstrap\n")
+cat("Najveća tačnost:", max(acc), ", fold:", which.max(acc))
+cat(", najveća kappa:", max(kappa), ", fold:", which.max(kappa), "\n")
+cat("Najmanja tačnost:", min(acc), ", fold:", which.min(acc))
+cat(", najmanja kappa:", min(kappa), ", fold:", which.min(kappa), "\n")
+cat("Srednja tačnost:", sum(acc) / length(acc))
+cat(", srednja kappa:", sum(kappa) / length(kappa), "\n\n")
+list <- bootstrap3(podaci, 5)
+acc <- list$acc
+kappa <- list$kappa
+cat("5-fold bootstrap\n")
+cat("Najveća tačnost:", max(acc), ", fold:", which.max(acc))
+cat(", najveća kappa:", max(kappa), ", fold:", which.max(kappa), "\n")
+cat("Najmanja tačnost:", min(acc), ", fold:", which.min(acc))
+cat(", najmanja kappa:", min(kappa), ", fold:", which.min(kappa), "\n")
+cat("Srednja tačnost:", sum(acc) / length(acc))
+cat(", srednja kappa:", sum(kappa) / length(kappa), "\n\n")
+
+
+```
+
+### c)
+
+Analizirati balansiranost podataka. Ukoliko set podataka nije balansiran, obavezno primijeniti neku od metoda za balansiranje seta podataka (oversampling ili undersampling) i izgraditi predikcijske modele iskazane pod a).
+
+Analizirati koja metoda je dala najbolja poboljšanja performansi klasifikatora.
+
+```{r}
+hist(as.numeric(podaci$Churn))
+#install.packages("ROSE")
+library(ROSE)
+oversample <- ovun.sample(Churn ~ ., data = podaci, method = "both",N = 2600)$data
+hist(as.numeric(oversample$Churn))
+set.seed(2222)
+rows <- sample(nrow(oversample))
+oversample <- oversample[rows, ]
+end <- length(oversample$Churn)
+n <- as.integer(0.85 * end)
+ podaci_train <- oversample[1 : n, ]
+ podaci_test <- oversample[(n + 1) : end, ]
+```
+
+```{r}
+#informacijska dobit
+#podjela skupa na trening i testni skup
+set.seed(2222)
+rows <- sample(nrow(oversample))
+oversample <- oversample[rows, ]
+end <- length(oversample$Churn)
+n <- as.integer(0.9 * end)
+ podaci_train <- oversample[1 : n, ]
+ podaci_test <- oversample[(n + 1) : end, ]
+
+#kreiranje stabla odlucivanja
+library(rpart)
+tree_information <- rpart(formula = Churn ~ .,
+ method = "class",
+ data = podaci_train,
+ parms = list(split = "information"))
+
+#crtanje stabla odlucivanja
+library(rpart.plot)
+rpart.plot(tree_information)
+
+#kreiranje konfuzijske matrice
+library(caret)
+tree_information <- rpart(formula = Churn ~ .,
+ method = "class",
+ data = podaci_train,
+ parms = list(split = "information"))
+
+#crtanje stabla odlucivanja
+library(rpart.plot)
+rpart.plot(tree_information)
+
+prediction <- predict(tree_information, newdata = subset(podaci_test, select = -
+c(Churn)))
+prediction<-prediction[,1]
+class_prediction <-ifelse(prediction > 0.50,"No","Yes")
+class_prediction<-factor(class_prediction, levels=levels(podaci_test$Churn))
+
+cm<-confusionMatrix(data=class_prediction, reference = podaci_test$Churn)
+draw_confusion_matrix(cm)
+
+#odredjivanje cp
+plotcp(tree_information)
+
+#smanjenje broja cvorova
+pruned_tree_information<-prune(tree_information, cp = 0.012)
+rpart.plot(pruned_tree_information)
+
+#kreiranje konfuzijske matrice za novo stablo
+library(caret)
+prediction <- predict(pruned_tree_information, newdata = subset(podaci_test, select = -c(Churn)))
+prediction<-prediction[,1]
+class_prediction <-ifelse(prediction > 0.50,"No","Yes")
+class_prediction<-factor(class_prediction, levels=levels(podaci_test$Churn))
+
+cm<-confusionMatrix(data=class_prediction, reference = podaci_test$Churn)
+draw_confusion_matrix(cm)
+```
+
+```{r}
+#gini kriterij
+
+end <- length(oversample$Churn)
+#n <- as.integer(0.9 * end)
+#podaci_train <- oversample[1 : n, ]
+#podaci_test <- oversample[(n + 1) : end, ]
+
+#kreiranje stabla odlucivanja
+tree_gain <- rpart(formula = Churn ~ .,
+method = "class",
+data = podaci_train)
+
+#crtanje stabla odlucivanja
+rpart.plot(tree_gain)
+
+#kreiranje konfuzijske matrice
+prediction_gain <- predict(tree_gain, newdata = subset(podaci_test, select = -
+c(Churn)))
+prediction_gain<-prediction_gain[,1]
+class_prediction <-ifelse(prediction > 0.50,"No","Yes")
+class_prediction<-factor(class_prediction, levels=levels(podaci_test$Churn))
+
+cm_gain<-confusionMatrix(data=class_prediction, reference = podaci_test$Churn)
+
+draw_confusion_matrix(cm_gain)
+
+#odredjivanje cp
+plotcp(tree_gain)
+
+#smanjenje broja cvorova
+pruned_tree_gain<-prune(tree_gain, cp = 0.01)
+rpart.plot(pruned_tree_gain)
+
+#kreiranje nove konfuzijske matrice
+prediction_gain <- predict(pruned_tree_gain, newdata = subset(podaci_test, select = -c(Churn)))
+prediction_gain<-prediction_gain[,1]
+class_prediction <-ifelse(prediction > 0.50,"No","Yes")
+class_prediction<-factor(class_prediction, levels=levels(podaci_test$Churn))
+
+cm_gain<-confusionMatrix(data=class_prediction, reference = podaci_test$Churn)
+cm_gain
+```
+
+```{r}
+#C5
+library(C50)
+library(caret)
+
+# end <- length(oversample$Churn)
+# n <- as.integer(0.9 * end)
+# podaci_train <- oversample[1 : n, ]
+# podaci_test <- oversample[(n + 1) : end, ]
+
+tree_C5 <- C5.0(x = subset(podaci_train, select = -c(Churn)), y =podaci_train$Churn)
+predictions <- predict(tree_C5, newdata = subset(podaci_test, select = -c(Churn)))
+
+cm_initial <- confusionMatrix(data = predictions, reference = podaci_test$Churn, positive = 'Yes')
+
+draw_confusion_matrix(cm_initial)
+```
+
+### d)
+
+Izgraditi sljedeće modele korištenjem ansambl tehnika za unaprjeđenje tačnosti klasifikacije:
+
+-   bagging model;
+
+-   boosting model (uz korištenje AdaBoost metode);
+
+-   random forest model.
+
+```{r}
+#bagging model
+library(rpart)
+library(ipred)
+set.seed(2222)
+bag <- bagging(formula = Churn ~ ., data = podaci_train, nbagg = 50,
+coob = TRUE, control = rpart.control(minsplit = 4, cp = 0))
+VI <- data.frame(var = names(podaci_train[, -1]), imp = varImp(bag))
+VI_plot <- VI[order(VI$Overall, decreasing = TRUE), ]
+par(mar=c(4,10,4,4))
+barplot(VI_plot$Overall, names.arg = rownames(VI_plot), horiz = TRUE,
+xlab = "Variable importance", las = 2)
+
+prediction <- predict(bag,newdata = subset(podaci_test,select = -c(Churn)))
+cm_bagging <- confusionMatrix(prediction,podaci_test$Churn)
+cm_bagging
+```
+
+```{r}
+#boosting model
+install.packages("adabag")
+library(adabag)
+set.seed(2222)
+model <- boosting(Churn ~ ., data = podaci_train, boos = TRUE, mfinal= 50)
+importanceplot(model)
+prediction <- predict(model,newdata = subset(podaci_test,select = -c(Churn)))
+prediction_factor <- factor(prediction$class)
+cm_adaboost <- confusionMatrix(prediction_factor,podaci_test$Churn)
+cm_adaboost
+```
+
+```{r}
+#random forest model
+library(randomForest)
+library(randomForestExplainer)
+set.seed(2222)
+forest <- randomForest(formula = Churn ~ ., data = podaci_train, ntree= 50)
+plot(forest)
+depth <- min_depth_distribution(forest)
+plot_min_depth_distribution(depth)
+```
+
+## Zadatak 3. (Testiranje najboljeg modela)
+
+Odabrati najbolji od svih kreiranih modela klasifikacije iz zadatka 2 i izvršiti njegovu evaluaciju nad testnim podskupom podataka za odgovarajuću nastavnu grupu:
+
+-   za grupe 1, 2 i 3 koristiti će se set podataka customer_data_test.csv;
+
+-   za grupe 4, 5 i 6 koristiti će se set podataka weather_data_test.csv.
+
+Dokumentovati dobivene rezultate. Da bi ovaj zadatak bio bodovan, potrebno je ispuniti sljedeće uslove:
+
+-   Tačnost veća od 0.75
+
+-   F1-mjera veća od 0.65
+
+-   Kappa statistika veća od 0.25
+
+-   Osjetljivost veća od 0.70
+
+-   Specifičnost veća od 0.75
+
+Ukoliko odabrani model ne ispunjava sve uslove, neophodno je ponoviti i dokumentovati proces iz zadataka 1 i 2 dok se ne dobije model koji ispunjava tražene uslove. Bodovanje ove aktivnosti je u okviru bodova za zadatak 2.
+
+```{r}
+podaci_testni <- read.csv("customer_data_test.csv", fileEncoding = 'UTF-8')
+
+#faktorizacija kategorickih varijabli
+podaci_testni$gender <- factor(podaci_testni$gender)
+podaci_testni$Dependents <- factor(podaci_testni$Dependents)
+podaci_testni$PhoneService <- factor(podaci_testni$PhoneService)
+podaci_testni$MultipleLines <- factor(podaci_testni$MultipleLines)
+podaci_testni$InternetService <- factor(podaci_testni$InternetService)
+podaci_testni$StreamingMovies <- factor(podaci_testni$StreamingMovies)
+podaci_testni$StreamingTV <- factor(podaci_testni$StreamingTV)
+podaci_testni$Contract <- factor(podaci_testni$Contract)
+podaci_testni$PaymentMethod <- factor(podaci_testni$PaymentMethod)
+podaci_testni$Churn <- factor(podaci_testni$Churn)
+```
+
+```{r}
+```
+
+```{r}
+library(rpart)
+library(ipred)
+#set.seed(19)
+# prediction <- predict(bag,newdata = subset(podaci_testni,select = -c(Churn)))
+# cm_bagging <- confusionMatrix(prediction,podaci_testni$Churn)
+# cm_bagging
+
+ predictions <- predict(tree_C5, newdata = subset(podaci_testni, select = -
+ c(Churn)))
+ 
+ cm_initial <- confusionMatrix(data = predictions, reference = podaci_testni$Churn)
+ 
+ draw_confusion_matrix(cm_initial)
+
+
+```
+
+## Zadatak 4 (Pravilo-bazirana klasifikacija)
+
+Izgraditi sljedeće pravilo-bazirane modele klasifikacije:
+
+-   1R model odlučivanja;
+
+-   RIPPER model odlučivanja.
+
+Izvršiti treniranje i evaluaciju ovih modela na isti način kao u zadatku 2, a zatim i njihovu evaluaciju nad testnim podskupom podataka na isti način kao u zadatku 3.
+
+Dokumentovati dobivene rezultate na isti način kao u prethodnim zadacima.
+
+Da bi ovaj zadatak bio bodovan, potrebno je ispuniti sljedeće uslove:
+
+-   Tačnost veća od 0.70
+
+-   Obuhvat veći od 0.80
+
+Prikazati skup pravila koji dovodi do ispunjenosti ova dva uslova.
+
+```{r}
+metrike_oner <- function(model, podaci)
+{
+ feature <- model$feature
+ target <- model$target
+ rules <- model$rules
+ coverage <- 0
+
+ for (i in 1 : length(rules))
+ {
+ pravilo <- names(rules[i])
+ rezultat <- unlist(rules[i])
+ subset <- podaci[podaci[[feature]] == pravilo, ]
+ coverage <- nrow(subset) / nrow(podaci)
+ correct <- subset[subset[[target]] == rezultat, ]
+ accuracy <- nrow(correct) / nrow(subset)
+ cat("Pravilo: IF", pravilo, "THEN", rezultat, ", pokrivenost:",
+coverage, ", tačnost:", accuracy, "\n")
+ }
+}
+```
+
+```{r}
+#1R model odlučivanja
+library(OneR)
+
+model <- OneR(podaci_train)
+summary(model)
+
+metrike_oner(model, podaci_train)
+
+plot(model)
+
+prediction <- predict(model, podaci_test)
+cm <- confusionMatrix(data = prediction, reference =podaci_test$Churn)
+
+fourfoldplot(cm$table, color = c("#99CC99", "#CC6666"),
+conf.level = 0, margin = 1, main = "Confusion Matrix")
+
+
+prediction <- predict(model, podaci_testni)
+cm <- confusionMatrix(data = prediction, reference =podaci_testni$Churn)
+
+fourfoldplot(cm$table, color = c("#99CC99", "#CC6666"),
+conf.level = 0, margin = 1, main = "Confusion Matrix")
+```
+
+```{r}
+#RIPPER model odlučivanja
+
+library(rJava)
+library(RWeka)
+
+model <- JRip(formula = Churn ~ ., data = podaci_train)
+summary(model)
+model
+
+
+library(pROC)
+prediction <- predict(model, podaci_test, type = "prob")
+roc <- roc(podaci_test$Churn, prediction[, 2], percent = TRUE)
+plot(roc$specificities, roc$sensitivities, type="l", lwd = 2, col =
+"blue", xlim = c(100, 0), ylim = c(0, 100))
+abline(coef = c(100, -1), col = "gray60")
+
+prediction <- predict(model, podaci_testni, type = "prob")
+roc <- roc(podaci_testni$Churn, prediction[, 2], percent = TRUE)
+plot(roc$specificities, roc$sensitivities, type="l", lwd = 2, col =
+"blue", xlim = c(100, 0), ylim = c(0, 100))
+ abline(coef = c(100, -1), col = "gray60")
+
+

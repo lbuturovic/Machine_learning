@@ -1,0 +1,83 @@
+---
+title: "Zadatak2_Lejla"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+podaci <- read.csv("nakon_1a_scale.csv", fileEncoding = 'UTF-8')
+```
+
+```{r}
+library(dbscan)
+library(fpc)
+library(factoextra)
+```
+#OPTICS algortam baziran na gustoći (Vildana)
+```{r}
+x <- podaci
+res <- optics(x,eps = 4, minPts = 20)
+res
+
+### get order
+res$order
+
+### plot produces a reachability plot
+plot(res)
+
+### plot the order of points in the reachability plot
+plot(x, col = "grey")
+polygon(x[res$order, ])
+
+# ### extract a DBSCAN clustering by cutting the reachability plot at eps_cl
+ res <- extractDBSCAN(res, eps_cl = .09)
+# res
+# 
+ plot(res)  ## black is noise
+ hullplot(x, res)
+### extract hierarchical clustering of varying density using the Xi method
+res <- extractXi(res, xi = 0.01)
+res
+
+plot(res)
+hullplot(x, res)
+```
+#DIANA hijerarhijski algoritam (Lejla)
+```{r}
+#diana
+library(dendextend)
+podaci <- read.csv("nakon_1a_scale.csv", fileEncoding = 'UTF-8')
+```
+```{r}
+res.diana <- diana(x = podaci, # data matrix
+stand = TRUE, # standardize the data
+metric = "pearson" # metric for distance matrix
+)
+pltree(res.diana, cex = 0.6, hang = -1, main = "Dendogram DIANA")
+rect.hclust(res.diana, k = 2, border = 3:5)
+```
+```{r}
+print(res.diana$dc)
+```
+```{r}
+grp_diana <- cutree(res.diana, k = 2)
+table(grp_diana)
+
+```
+```{r}
+clusters_print <- function (labels, k){
+  for(i in 1:k){
+    print(paste("cluster", i))
+    print(podaci[labels==i, c("Income", "TotalSpent", "Age")])
+  }
+}
+```
+
+```{r}
+clusters_print(grp_diana,2)
+fviz_cluster(list(data = podaci, cluster = grp_diana))
+```
+
+

@@ -1,0 +1,3 @@
+"0","library(cluster)"
+"0","model <- pam(podaci, k = 2)"
+"0","plot(podaci[c(""Income"", ""TotalSpent"")], col = model$cluster)"

@@ -1,0 +1,294 @@
+---
+title: "Zadaca 3"
+output: html_document
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##Zadatak 1: a) Analizirati set podataka i izvršiti sljedeće: - Odrediti
+tipove i distribuciju atributa; - Ispuniti nedostajuće i ukloniti
+nepodobne vrijednosti ukoliko je potrebno; - Uraditi transformaciju i
+skaliranje atributa u skladu sa njihovom distribucijom i algoritmima
+koji će se koristiti u narednim koracima; - Odrediti da li set podataka
+ima klastering tendenciju; - Utvrditi da li je potrebno izvršiti dodatne
+analize za podatke, kao i dodatne transformacije, skaliranja i sl.
+
+```{r}
+podaci <- read.csv("marketing_campaign.csv", fileEncoding = 'UTF-8', sep = '\t')
+dim(podaci)
+names(podaci)
+```
+
+```{r}
+summary(podaci)
+```
+
+```{r}
+#- Odrediti tipove i distribuciju atributa;
+
+#crtanje barcharta
+for (i in colnames(podaci)){
+  #if (class(podaci[[i]]) == "character")
+    barplot(table(podaci[[i]]),
+    main=colnames(podaci[i]),
+    ylim= c(0, length(podaci[[i]])),
+    ylab="Broj",
+    border="red",
+    col="blue",
+    density=10
+    )
+  #else if (class(podaci[[i]]) == "integer")
+  #  boxplot(table(podaci[[i]]), main = colnames(podaci[i]))
+}
+unique(podaci$Marital_Status)
+unique(podaci$Education)
+#dopuniti
+```
+
+```{r}
+#iz rezultata funkcije summary možemo zaključiti da se jedino u atributu Income nalaze NA vrijednosti, pa ćemo ih popuniti medijanom
+podaci$Income[is.na(podaci$Income)]=median(podaci$Income,na.rm=T)
+sum(is.na(podaci$Income))
+```
+
+Analiza distribucije atributa
+
+```{r}
+
+```
+
+```{r}
+#broj unikatnih vrijednosti u kolonama
+sapply(podaci, function(x) length(unique(x)))
+```
+
+```{r}
+# s obzirom da atributi Z_Revenue i Z_CostContact imaju po samo jednu vrijednost, ove kolone su bespotrebne i mogu se odbaciti
+podaci = subset(podaci, select=-c(Z_CostContact,Z_Revenue))
+```
+
+```{r}
+#može nam biti korisan atribut koji opisuje broj godina kupca
+trenutna_godina = Sys.Date()
+trenutna_godina = format(trenutna_godina,format="%Y")
+trenutna_godina = as.integer(trenutna_godina)
+podaci$Age = c(trenutna_godina - podaci$Year_Birth)
+Sys.Date()
+```
+
+```{r}
+print(subset(podaci, (Age > 100 | Income > 600000)))
+#izbacivanje outliera
+podaci <- podaci[!rownames(podaci) %in% c("193", "240", "340", "2234"), ]
+```
+
+```{r}
+#atribut koji opisuje datum nije loše transformirati u numerički atribut koji opisuje koliko je dana prošlo od prve interakcije korisnika sa kompanijom
+
+podaci$Dt_CustomerCovert1 = as.Date(podaci$Dt_Customer, format = "%d-%m-%Y")
+podaci$Dt_CustomerCovert2 = as.Date("15-01-2022", format = "%d-%m-%Y") - as.Date(podaci$Dt_CustomerCovert1, format = "%d-%m-%Y")
+podaci$NumberofDayEnrolled = as.numeric(podaci$Dt_CustomerCovert2, units="days")
+
+```
+
+```{r}
+
+#mogu se i spojiti kolone KidHome i TeenHome
+
+podaci$Kidhome = podaci$Kidhome + podaci$Teenhome
+podaci$TotalSpent = podaci$MntMeatProducts+podaci$MntFishProducts+podaci$MntWines+podaci$MntFruits+podaci$MntSweetProducts+podaci$MntGoldProds
+podaci$Accepted = podaci$AcceptedCmp1+podaci$AcceptedCmp2+podaci$AcceptedCmp3+podaci$AcceptedCmp4+podaci$AcceptedCmp5
+```
+
+```{r}
+#fviz_nbclust(podaci,kmeans,method="wss")+geom_vline(xintercept=3,linetype=2)
+```
+
+```{r}
+library(dplyr)
+```
+
+```{r}
+
+#obrisat cemo nepotrebne kolone
+drop <- c("Dt_CustomerCovert1","Dt_CustomerCovert2","Dt_Customer", "Year_Birth", "ID", "Teenhome", "MntMeatProducts", "MntFishProducts", "MntWines", "MntFruits", "MntSweetProducts", "MntGoldProds", "AcceptedCmp1", "AcceptedCmp2", "AcceptedCmp3", "AcceptedCmp4", "AcceptedCmp5")
+podaci = podaci[,!(names(podaci) %in% drop)]
+```
+
+Uraditi transformaciju i skaliranje atributa u skladu sa njihovom
+distribucijom i algoritmima koji će se koristiti u narednim koracima;
+
+```{r}
+#transformacija atributa
+podaci$Education <- as.numeric(factor(podaci$Education))
+podaci$Marital_Status <- as.numeric(factor(podaci$Marital_Status))
+podaci$Kidhome <- as.numeric(factor(podaci$Kidhome))
+podaci$Recency <- as.numeric(factor(podaci$Recency))
+podaci$NumDealsPurchases <- as.numeric(factor(podaci$NumDealsPurchases))
+podaci$NumWebPurchases <- as.numeric(factor(podaci$NumWebPurchases))
+podaci$NumCatalogPurchases <- as.numeric(factor(podaci$NumCatalogPurchases))
+podaci$NumStorePurchases <- as.numeric(factor(podaci$NumStorePurchases))
+podaci$NumWebVisitsMonth <- as.numeric(factor(podaci$NumWebVisitsMonth))
+podaci$Complain <- as.numeric(factor(podaci$Complain))
+podaci$Response <- as.numeric(factor(podaci$Response))
+podaci$Age <- as.numeric(factor(podaci$Age))
+podaci$NumberofDayEnrolled <- as.numeric(factor(podaci$NumberofDayEnrolled))
+podaci$TotalSpent <- as.numeric(factor(podaci$TotalSpent))
+podaci$Accepted <- as.numeric(factor(podaci$Accepted))
+```
+```{r}
+podaci <- scale(podaci)
+```
+
+```{r}
+write.csv(podaci,"nakon_1a_scale.csv", row.names = FALSE)
+```
+```{r}
+library(clustertend)
+set.seed(123)
+hopkins1 <- hopkins(podaci, n = 100)
+cat("Hopkins statistika za originalne podatke:", hopkins1$H, "\n")
+```
+
+```{r}
+library(factoextra)
+distance <- get_dist(podaci, method = "manhattan")
+fviz_dist(distance, gradient = list(low = "blue", mid = "white", high =
+"red"))
+distance <- get_dist(podaci, method = "euclidean")
+fviz_dist(distance, gradient = list(low = "blue", mid = "white", high =
+"red"))
+distance <- get_dist(podaci, method = "minkowski")
+fviz_dist(distance, gradient = list(low = "blue", mid = "white", high =
+"red"))
+distance <- get_dist(podaci, method = "pearson")
+fviz_dist(distance, gradient = list(low = "blue", mid = "white", high =
+"red"))
+```
+## 1. d)
+
+```{r}
+# podaciOrg <- read.csv("marketing_campaign.csv", fileEncoding = 'UTF-8', sep = '\t')
+# #iz rezultata funkcije summary možemo zaključiti da se jedino u atributu Income nalaze NA vrijednosti, pa ćemo ih popuniti medijanom
+# podaciOrg$Income[is.na(podaciOrg$Income)]=median(podaciOrg$Income,na.rm=T)
+# sum(is.na(podaciOrg$Income))
+# # s obzirom da atributi Z_Revenue i Z_CostContact imaju po samo jednu vrijednost, ove kolone su bespotrebne i mogu se odbaciti
+# podaciOrg <- subset(podaciOrg, select=-c(Z_CostContact,Z_Revenue,ID))
+# #izbacivanje outliera
+# podaciOrg <- podaciOrg[!rownames(podaciOrg) %in% c("193", "240", "340", "2234"), ]
+# j <- 1
+# for (i in colnames(podaciOrg)){
+#   podaciOrg[,j] <- as.numeric(factor(podaciOrg[,j]))
+#   j <- j + 1
+# }
+```
+
+```{r}
+podaci <- read.csv("nakon_1a_scale.csv", fileEncoding = 'UTF-8')
+```
+
+d)
+#PCA analiza
+```{r}
+library(stats)
+pca <- prcomp(podaci, scale. = FALSE)
+fviz_eig(pca)
+summary(pca)
+```
+
+
+```{r}
+fviz_pca_var(pca,
+ col.var = "contrib",
+ gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+ repel = TRUE
+ )
+```
+
+```{r}
+newdata <- predict(pca, podaci)
+newdata <- newdata[, 1:10]
+newdata <- data.frame(newdata)
+```
+```{r}
+head(newdata)
+```
+
+```{r}
+set.seed(123)
+hopkins1 <- hopkins(newdata, n = 100)
+cat("Hopkins statistika za modifikovane podatke:", hopkins1$H, "\n")
+```
+
+```{r}
+library(factoextra)
+# distance <- get_dist(newdata, method = "manhattan")
+# fviz_dist(distance, gradient = list(low = "blue", mid = "white", high =
+# "red"))
+# distance <- get_dist(newdata, method = "euclidean")
+# fviz_dist(distance, gradient = list(low = "blue", mid = "white", high =
+# "red"))
+# distance <- get_dist(newdata, method = "minkowski")
+# fviz_dist(distance, gradient = list(low = "blue", mid = "white", high =
+# "red"))
+# distance <- get_dist(newdata, method = "pearson")
+# fviz_dist(distance, gradient = list(low = "blue", mid = "white", high =
+# "red"))
+```
+#PAM k-medoids
+```{r}
+#optimalni broj klastera
+fviz_nbclust(newdata, pam, method = "wss")
+fviz_nbclust(newdata, pam, method = "silhouette")
+fviz_nbclust(newdata, pam, method = "gap_stat", nboot = 2)
+
+```
+```{r}
+library(amap)
+library(cluster)
+modelPAMm <- pam(newdata, 2, metric = "manhattan")
+sil <- silhouette(modelPAMm$cluster, get_dist(newdata, method =
+"manhattan"))
+fviz_cluster(modelPAMm, data = newdata, geom = "point")
+cat("Srednja vrijednost silhouette metrike za PAM (manhattan metrika):", 
+mean(sil[, 3]), "\n")
+fviz_silhouette(modelPAMm)
+
+modelPAMe <- pam(newdata, 2, metric = "euclidean")
+sil <- silhouette(modelPAMe$cluster, get_dist(newdata, method =
+"euclidean"))
+fviz_cluster(modelPAMe, data = newdata, geom = "point")
+cat("Srednja vrijednost silhouette metrike za PAM (euclidean metrika):", 
+mean(sil[, 3]))
+fviz_silhouette(modelPAMe)
+
+```
+
+```{r}
+library(amap)
+modelKp <- Kmeans(newdata, centers = 2, method = "pearson")
+fviz_cluster(modelKp, data = newdata, geom = "point")
+sil <- silhouette(modelKp$cluster, get_dist(newdata, method = "pearson"))
+cat("Srednja vrijednost silhouette metrike za kmeans:", mean(sil[, 3]), 
+"\n")
+plot(sil, border = NA)
+
+
+```
+```{r}
+library(amap)
+modelKe <- Kmeans(newdata, centers = 2, method = "euclidean")
+fviz_cluster(modelKp, data = newdata, geom = "point")
+sil <- silhouette(modelKe$cluster, get_dist(newdata, method = "euclidean"))
+cat("Srednja vrijednost silhouette metrike za kmeans:", mean(sil[, 3]), 
+"\n")
+plot(sil, border = NA)
+```
+
+
+

@@ -1,0 +1,721 @@
+---
+title: "Neuralne mreze"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Neuralne mreze
+```{r}
+#save.image(file='myEnvironment.RData')
+#load('myEnvironment.RData')
+```
+
+```{r}
+# ucitavanje podataka 
+podaci <- read.csv("podaciProcesirani.csv", fileEncoding = 'UTF-8')
+
+#faktorizacija kategorickih varijabli i pretvaranje u numeričke vrijednosti
+podaci$gender <- as.numeric(factor(podaci$gender))
+podaci$Dependents <- as.numeric(factor(podaci$Dependents))
+podaci$PhoneService <- as.numeric(factor(podaci$PhoneService))
+podaci$StreamingTV <- as.numeric(factor(podaci$StreamingTV))
+podaci$Contract <- as.numeric(factor(podaci$Contract))
+podaci$PaymentMethod <- as.numeric(factor(podaci$PaymentMethod))
+podaci$InternetService <- as.numeric(factor(podaci$InternetService))
+
+#Labela klase mora biti označena isključivo labelama 0 i 1
+podaci$Churn[podaci$Churn == "Yes"] <- 1
+podaci$Churn[podaci$Churn == "No"] <- 0
+podaci$Churn <- as.numeric(podaci$Churn)
+#normalizacija svih atributa osim labele klase u opseg 0-1
+library(class)
+library(caret)
+
+preObj <- preProcess(subset(podaci, select = -c(Churn)),
+method=c("range"), rangebounds = c(0, 1))
+class <- podaci$Churn
+podaci <- predict(preObj, subset(podaci, select = -c(Churn)))
+podaci$Churn <- class
+
+#podjela na trening i testne podatke
+#korisitimo seed 5*
+set.seed(5)
+rows <- sample(nrow(podaci))
+podaci <- podaci[rows, ]
+end <- length(podaci$Churn)
+n <- as.integer(0.8 * end)
+podaci_train <- podaci[1 : n, ]
+podaci_test <- podaci[(n + 1) : end, ]
+
+podaci_train_pocetni <- podaci_train
+podaci_test_pocetni <- podaci_train
+
+#provjera da li je set.seed ok
+print(rows[1:5])
+#773 1722  652  999  548 seed 3
+#834 697 207 715 889 seed = 5
+#975 710 774 416 392 seed 2
+#549  495 1698 1529 1318 seed 15
+```
+```{r}
+library(neuralnet)
+```
+
+
+```{r}
+#Jednostavni perceptron sa jednim slojem i jednim neuronom
+#za seed = 5 dobije se 644,346 i 3751 koraka
+
+#treniranje u jednoj epohi
+set.seed(5)
+podaci_train1 <- podaci_train_pocetni
+model_one <- neuralnet(formula = Churn ~ .,
+ data = podaci_train1,
+ linear.output = FALSE,
+ err.fct = "ce",
+ hidden = 1,
+ lifesign = "full")
+plot(model_one)
+```
+```{r}
+#treniranje u 5 epoha sa jednim slojem i jednim neuronom
+#644,345  4027
+set.seed(5)
+podaci_train2 <- podaci_test_pocetni
+model_one_rep_5 <- neuralnet(formula = Churn ~ .,
+ data = podaci_train2,
+ linear.output = FALSE,
+ err.fct = "ce",
+ hidden = 1,
+ rep = 5,
+ lifesign = "minimal")
+```
+```{r}
+plot(model_one_rep_5, rep = "best")
+```
+```{r}
+#treniranje u 7 epoha s jednim slojem i jednim neuronom
+#644,345  4027
+set.seed(5)
+podaci_train3 <- podaci_train_pocetni
+model_one_rep_7 <- neuralnet(formula = Churn ~ .,
+ data = podaci_train3,
+ linear.output = FALSE,
+ err.fct = "ce",
+ hidden = 1,
+ rep = 7,
+ lifesign = "minimal")
+
+#treca epoha najbolja
+plot(model_one_rep_7, rep = "best")
+```
+```{r}
+#Perceptron sa jednim slojem i više neurona
+#4 neurona i 1 epoha
+#576,72 29470
+set.seed(5)
+podaci_train4 <- podaci_train_pocetni
+model_multiple_4 <- neuralnet(formula = Churn ~ .,
+ data = podaci_train4,
+ linear.output = FALSE,
+ err.fct = "ce",
+ hidden = 4,
+ lifesign = "minimal")
+```
+```{r}
+plot(model_multiple_4, rep = "best")
+```
+```{r}
+#Perceptron sa jednim slojem i više neurona
+#7 neurona i 1 epoha
+#509,83  35076
+set.seed(5)
+model_multiple_7 <- neuralnet(formula = Churn ~ .,
+ data = podaci_train,
+ linear.output = FALSE,
+ err.fct = "ce",
+ hidden = 7,
+ lifesign = "minimal")
+plot(model_multiple_7, rep = "best")
+```
+```{r}
+#Perceptron sa jednim slojem i više neurona
+#8 neurona i 1 epoha
+#496,56   35202
+set.seed(5)
+podaci_train6 <- podaci_train_pocetni
+model_multiple_8 <- neuralnet(formula = Churn ~ .,
+ data = podaci_train6,
+ linear.output = FALSE,
+ err.fct = "ce",
+ hidden = 8,
+ lifesign = "minimal")
+plot(model_multiple_8, rep = "best")
+```
+```{r}
+#Perceptron sa jednim slojem i više neurona
+#12 neurona i 1 epoha
+#434,48112
+set.seed(5)
+
+model_multiple_12 <- neuralnet(formula = Churn ~ .,
+ data = podaci_train,
+ linear.output = FALSE,
+ err.fct = "ce",
+ hidden = 12,
+ stepmax = 200000,
+ lifesign = "minimal")
+plot(model_multiple_12, rep = "best")
+```
+
+```{r}
+#Perceptron sa jednim slojem i više neurona
+#4 neurona i 3 epohe
+#565,58   86411
+set.seed(5)
+podaci_train8 <- podaci_train_pocetni
+model_multiple_4_rep_3 <- neuralnet(formula = Churn ~ .,
+ data = podaci_train8,
+ linear.output = FALSE,
+ err.fct = "ce",
+ hidden = 4,
+ rep = 3,
+ lifesign = "minimal")
+
+plot(model_multiple_4_rep_3, rep = "best")
+```
+
+
+```{r}
+#višeslojne neuralne mreže
+# dva sloja sa po 3 i 1 neurona i jednom epohom
+#610,17   73139
+set.seed(5)
+model_multiple_layers_3_1 <- neuralnet(formula = Churn ~ .,
+ data = podaci_train,
+ linear.output = FALSE,
+ err.fct = "ce",
+ hidden = c(3,1),
+ lifesign = "minimal")
+
+plot(model_multiple_layers_3_1)
+
+```
+
+```{r}
+#višeslojne neuralne mreže
+# dva sloja sa po 4 i 2 neurona i jednom epohom
+#558.55092    303485
+set.seed(5)
+model_multiple_layers_4_2 <- neuralnet(formula = Churn ~ .,
+ data = podaci_train,
+ linear.output = FALSE,
+ err.fct = "ce",
+ hidden = c(4,2),
+ stepmax = 700000,
+ lifesign = "minimal")
+
+plot(model_multiple_layers_4_2)
+```
+```{r}
+# #višeslojne neuralne mreže
+# # dva sloja sa po 7 i 2 neurona i jednom epohom
+# #
+# set.seed(5)
+# model_multiple_layers_7_2 <- neuralnet(formula = Churn ~ .,
+#  data = podaci_train,
+#  linear.output = FALSE,
+#  err.fct = "ce",
+#  hidden = c(7,2),
+#  stepmax = 3000000,
+#  lifesign = "minimal")
+# 
+# plot(model_multiple_layers_7_2)
+```
+```{r}
+# 12 neurona i 4 epohe
+#417,88
+set.seed(5)
+model_multiple_12_rep_4 <- neuralnet(formula = Churn ~ .,
+ data = podaci_train,
+ linear.output = FALSE,
+ err.fct = "ce",
+ hidden = 12,
+ rep = 4,
+ stepmax = 1500000,
+ lifesign = "minimal")
+```
+```{r}
+plot(model_multiple_12_rep_4, rep = "best")
+```
+```{r}
+draw_confusion_matrix <- function(cm)
+{
+ columns <- colnames(cm$table)
+ rows <- rownames(cm$table)
+ layout(matrix(c(1,1,2)))
+ par(mar=c(2,2,2,2))
+ plot(c(100, 345), c(300, 450), type = "n", xlab="", ylab="", xaxt='n',
+yaxt='n')
+ title('CONFUSION MATRIX', cex.main=2)
+ rect(150, 430, 240, 370, col='#3F97D0')
+ text(195, 435, columns[1], cex=1.2)
+ rect(250, 430, 340, 370, col='#F7AD50')
+ text(295, 435, columns[2], cex=1.2)
+ text(125, 370, 'Predicted', cex=1.3, srt=90, font=2)
+ text(245, 450, 'Actual', cex=1.3, font=2)
+ rect(150, 305, 240, 365, col='#F7AD50')
+ rect(250, 305, 340, 365, col='#3F97D0')
+ text(140, 400, rows[1], cex=1.2, srt=90)
+ text(140, 335, rows[2], cex=1.2, srt=90)
+ res <- as.numeric(cm$table)
+ text(195, 400, res[1], cex=1.6, font=2, col='white')
+ text(195, 335, res[2], cex=1.6, font=2, col='white')
+ text(295, 400, res[3], cex=1.6, font=2, col='white')
+ text(295, 335, res[4], cex=1.6, font=2, col='white')
+ plot(c(100, 0), c(100, 0), type = "n", xlab="", ylab="", main =
+"DETAILS", xaxt='n', yaxt='n')
+ text(10, 85, names(cm$byClass[1]), cex=1.2, font=2)
+ text(10, 70, round(as.numeric(cm$byClass[1]), 3), cex=1.2)
+ text(30, 85, names(cm$byClass[2]), cex=1.2, font=2)
+ text(30, 70, round(as.numeric(cm$byClass[2]), 3), cex=1.2)
+ text(50, 85, names(cm$byClass[5]), cex=1.2, font=2)
+ text(50, 70, round(as.numeric(cm$byClass[5]), 3), cex=1.2)
+ text(70, 85, names(cm$byClass[6]), cex=1.2, font=2)
+ text(70, 70, round(as.numeric(cm$byClass[6]), 3), cex=1.2)
+ text(90, 85, names(cm$byClass[7]), cex=1.2, font=2)
+ text(90, 70, round(as.numeric(cm$byClass[7]), 3), cex=1.2)
+ text(30, 35, names(cm$overall[1]), cex=1.5, font=2)
+ text(30, 20, round(as.numeric(cm$overall[1]), 3), cex=1.4)
+ text(70, 35, names(cm$overall[2]), cex=1.5, font=2)
+ text(70, 20, round(as.numeric(cm$overall[2]), 3), cex=1.4)
+}
+```
+
+```{r}
+#Evaluacija tačnosti nad trening skupom podataka
+library(caret)
+train_accuracy <- function(model)
+{
+ result <- model$net.result
+ predictions <- result[[length(result)]]
+
+ predictions[predictions > 0.5] <- 1
+ predictions[predictions <= 0.5] <- 0
+ predictions <- factor(predictions)
+ cm <- confusionMatrix(data = predictions, reference =
+factor(podaci_train$Churn))
+ cat("Train accuracy:", cm$overall[1], "\n")
+}
+
+```
+```{r}
+cat("Jedan neuron, jedna epoha - ")
+train_accuracy(model_one)
+cat("Jedan neuron, pet epoha - ")
+train_accuracy(model_one_rep_5)
+cat("Jedan neuron, sedam epoha - ")
+train_accuracy(model_one_rep_7)
+cat("Četiri neurona, jedna epoha - ")
+train_accuracy(model_multiple_4)
+cat("Četiri neurona, tri epohe - ")
+train_accuracy(model_multiple_4_rep_3)
+cat("Dva sloja (4,2) - ")
+train_accuracy(model_multiple_layers_4_2)
+cat("Dva sloja (3,1) - ")
+train_accuracy(model_multiple_layers_3_1)
+cat("Sedam neurona, jedna epoha - ")
+train_accuracy(model_multiple_7)
+cat("Osam neurona, jedna epoha - ")
+train_accuracy(model_multiple_8)
+cat("Dvanaest neurona, jedna epoha - ")
+train_accuracy(model_multiple_12)
+cat("Dvanaest neurona, četiri epohe - ")
+train_accuracy(model_multiple_12_rep_4)
+```
+
+```{r}
+test_accuracy <- function(model)
+{
+ predictions <- compute(model, subset(podaci_test, select = -c(Churn)))
+ predictions <- predictions$net.result
+
+ predictions[predictions > 0.5] <- 1
+ predictions[predictions <= 0.5] <- 0
+ predictions <- factor(predictions)
+ cm <- confusionMatrix(data = predictions, reference =
+factor(podaci_test$Churn), positive = "1")
+ draw_confusion_matrix(cm)
+ cat("Test accuracy:", cm$overall[1], "\n")
+}
+```
+```{r}
+cat("Jedan neuron, jedna epoha - ")
+test_accuracy(model_one)
+cat("Jedan neuron, pet epoha - ")
+test_accuracy(model_one_rep_5)
+cat("Jedan neuron, sedam epoha - ")
+test_accuracy(model_one_rep_7)
+cat("Četiri neurona, jedna epoha - ")
+test_accuracy(model_multiple_4)
+cat("Četiri neurona, tri epohe - ")
+test_accuracy(model_multiple_4_rep_3)
+cat("Dva sloja (4,2) - ")
+test_accuracy(model_multiple_layers_4_2)
+cat("Dva sloja (3,1) - ")
+test_accuracy(model_multiple_layers_3_1)
+cat("Sedam neurona, jedna epoha - ")
+test_accuracy(model_multiple_7)
+cat("Osam neurona, jedna epoha - ")
+test_accuracy(model_multiple_8)
+cat("Dvanaest neurona, jedna epoha - ")
+test_accuracy(model_multiple_12)
+cat("Dvanaest neurona, četiri epohe - ")
+test_accuracy(model_multiple_12_rep_4)
+```
+
+```{r}
+#balansiranje trening skupa pomoću oversamplinga
+
+broj_instanci_yes <- length(subset(podaci, Churn == 1)$gender)
+broj_instanci_no <- length(subset(podaci, Churn == 0)$gender)
+cat("Broj instanci koje imaju Yes vrijednost u trening skupu: ", broj_instanci_yes,"\n")
+cat("Broj instanci koje imaju No vrijednost u trening skupu: ", broj_instanci_no)
+
+library(ROSE)
+oversample_train <- ovun.sample(Churn ~ ., data = podaci_train, method = "both",
+N = 1610)$data
+#N=2100 za "over"
+#N=1610 za "both"
+
+broj_instanci_yes <- length(subset(oversample_train, Churn == 1)$gender)
+broj_instanci_no <- length(subset(oversample_train, Churn == 0)$gender)
+cat("\nBroj instanci koje imaju Yes vrijednost u trening skupu nakon oversamplinga: ", broj_instanci_yes,"\n")
+cat("Broj instanci koje imaju No vrijednost u trening skupu nakon oversamplinga: ", broj_instanci_no)
+
+```
+```{r}
+set.seed(5)
+O_model_one <- neuralnet(formula = Churn ~ .,
+ data = oversample_train,
+ linear.output = FALSE,
+ err.fct = "ce",
+ hidden = 1,
+ lifesign = "full")
+plot(O_model_one)
+```
+```{r}
+#treniranje u 5 epoha sa jednim slojem i jednim neuronom
+#644,345  4027
+set.seed(5)
+O_model_one_rep_5 <- neuralnet(formula = Churn ~ .,
+ data = oversample_train,
+ linear.output = FALSE,
+ err.fct = "ce",
+ hidden = 1,
+ rep = 5,
+ stepmax = 700000,
+ lifesign = "minimal")
+
+plot(O_model_one_rep_5, rep = "best")
+```
+```{r}
+#Perceptron sa jednim slojem i više neurona
+#4 neurona i 1 epoha
+#672,98
+set.seed(5)
+O_model_multiple_4 <- neuralnet(formula = Churn ~ .,
+ data = oversample_train,
+ linear.output = FALSE,
+ err.fct = "ce",
+ hidden = 4,
+ stepmax = 700000,
+ lifesign = "minimal")
+
+plot(O_model_multiple_4)
+```
+```{r}
+#Perceptron sa jednim slojem i više neurona
+#12 neurona i 1 epoha
+#396,12441  140203
+set.seed(5)
+O_model_multiple_12 <- neuralnet(formula = Churn ~ .,
+ data = oversample_train,
+ linear.output = FALSE,
+ err.fct = "ce",
+ hidden = 12,
+ stepmax = 1000000,
+ lifesign = "minimal")
+
+plot(O_model_multiple_12)
+```
+
+```{r}
+cat("Nakon oversampleinga:\n")
+podaci_train <- oversample_train
+cat("Jedan neuron, jedna epoha - ")
+train_accuracy(O_model_one)
+test_accuracy(O_model_one)
+cat("Jedan neuron, pet epoha - ")
+train_accuracy(O_model_one_rep_5)
+test_accuracy(O_model_one_rep_5)
+cat("Četiri neurona, jedna epoha - ")
+train_accuracy(O_model_multiple_4)
+test_accuracy(O_model_multiple_4)
+cat("Dvanaest neurona, jedna epoha - ")
+train_accuracy(O_model_multiple_12)
+test_accuracy(O_model_multiple_12)
+podaci_train <- podaci_train_pocetni
+```
+```{r}
+#rezultati nisu zadivljujuci, probat cemo undersampling
+#balansiranje trening skupa pomoću oversamplinga
+
+broj_instanci_yes <- length(subset(podaci, Churn == 1)$gender)
+broj_instanci_no <- length(subset(podaci, Churn == 0)$gender)
+cat("Broj instanci koje imaju Yes vrijednost u trening skupu: ", broj_instanci_yes,"\n")
+cat("Broj instanci koje imaju No vrijednost u trening skupu: ", broj_instanci_no)
+
+library(ROSE)
+undersample_train <- ovun.sample(Churn ~ ., data = podaci_train, method = "under",
+N = 850)$data
+#N=2100 za "over"
+#N=1610 za "both"
+
+broj_instanci_yes <- length(subset(undersample_train, Churn == 1)$gender)
+broj_instanci_no <- length(subset(undersample_train, Churn == 0)$gender)
+cat("\nBroj instanci koje imaju Yes vrijednost u trening skupu nakon undersamplinga: ", broj_instanci_yes,"\n")
+cat("Broj instanci koje imaju No vrijednost u trening skupu nakon undersamplinga: ", broj_instanci_no)
+
+```
+```{r}
+#442,12   34551
+set.seed(5)
+U_model_one <- neuralnet(formula = Churn ~ .,
+ data = undersample_train,
+ linear.output = FALSE,
+ err.fct = "ce",
+ hidden = 1,
+ lifesign = "full")
+plot(U_model_one)
+```
+```{r}
+#treniranje u 5 epoha sa jednim slojem i jednim neuronom
+#442,124  29024
+set.seed(5)
+U_model_one_rep_5 <- neuralnet(formula = Churn ~ .,
+ data = undersample_train,
+ linear.output = FALSE,
+ err.fct = "ce",
+ hidden = 1,
+ rep = 5,
+ stepmax = 700000,
+ lifesign = "minimal")
+
+plot(U_model_one_rep_5, rep = "best")
+```
+```{r}
+#Perceptron sa jednim slojem i više neurona
+#4 neurona i 1 epoha
+#371,77   21783
+set.seed(5)
+U_model_multiple_4 <- neuralnet(formula = Churn ~ .,
+ data = undersample_train,
+ linear.output = FALSE,
+ err.fct = "ce",
+ hidden = 4,
+ stepmax = 700000,
+ lifesign = "minimal")
+
+plot(U_model_multiple_4)
+```
+```{r}
+#Perceptron sa jednim slojem i više neurona
+#12 neurona i 1 epoha
+#255,20
+set.seed(5)
+U_model_multiple_12 <- neuralnet(formula = Churn ~ .,
+ data = undersample_train,
+ linear.output = FALSE,
+ err.fct = "ce",
+ hidden = 12,
+ stepmax = 700000,
+ lifesign = "minimal")
+
+plot(U_model_multiple_12)
+```
+```{r}
+cat("Nakon undersampleinga:\n")
+podaci_train <- undersample_train
+cat("Jedan neuron, jedna epoha - ")
+train_accuracy(U_model_one)
+test_accuracy(U_model_one)
+cat("Jedan neuron, pet epoha - ")
+train_accuracy(U_model_one_rep_5)
+test_accuracy(U_model_one_rep_5)
+cat("Četiri neurona, jedna epoha - ")
+train_accuracy(U_model_multiple_4)
+test_accuracy(U_model_multiple_4)
+cat("Dvanaest neurona, jedna epoha - ")
+train_accuracy(U_model_multiple_12)
+test_accuracy(U_model_multiple_12)
+podaci_train <- podaci_train_pocetni
+```
+```{r}
+cat("Ukupni rezultati: \n")
+cat("Jedan neuron, jedna epoha - \n")
+train_accuracy(model_one)
+test_accuracy(model_one)
+cat("\nJedan neuron, pet epoha - \n")
+train_accuracy(model_one_rep_5)
+test_accuracy(model_one_rep_5)
+cat("\nJedan neuron, sedam epoha - \n")
+train_accuracy(model_one_rep_7)
+test_accuracy(model_one_rep_7)
+cat("\nČetiri neurona, jedna epoha - \n")
+train_accuracy(model_multiple_4)
+test_accuracy(model_multiple_4)
+cat("\nČetiri neurona, tri epohe - \n")
+train_accuracy(model_multiple_4_rep_3)
+test_accuracy(model_multiple_4_rep_3)
+cat("\nDva sloja (4,2) - \n")
+train_accuracy(model_multiple_layers_4_2)
+test_accuracy(model_multiple_layers_4_2)
+cat("\nDva sloja (3,1) - \n")
+train_accuracy(model_multiple_layers_3_1)
+test_accuracy(model_multiple_layers_3_1)
+cat("\nSedam neurona, jedna epoha - \n")
+train_accuracy(model_multiple_7)
+test_accuracy(model_multiple_7)
+cat("\nOsam neurona, jedna epoha - \n")
+train_accuracy(model_multiple_8)
+test_accuracy(model_multiple_8)
+cat("\nDvanaest neurona, jedna epoha - \n")
+train_accuracy(model_multiple_12)
+test_accuracy(model_multiple_12)
+cat("\nDvanaest neurona, četiri epohe - \n")
+train_accuracy(model_multiple_12_rep_4)
+test_accuracy(model_multiple_12_rep_4)
+cat("\nNakon oversampleinga:\n\n")
+podaci_train <- oversample_train
+cat("\nJedan neuron, jedna epoha - \n")
+train_accuracy(O_model_one)
+test_accuracy(O_model_one)
+cat("\nJedan neuron, pet epoha - \n")
+train_accuracy(O_model_one_rep_5)
+test_accuracy(O_model_one_rep_5)
+cat("\nČetiri neurona, jedna epoha - \n")
+train_accuracy(O_model_multiple_4)
+test_accuracy(O_model_multiple_4)
+cat("\nDvanaest neurona, jedna epoha - \n")
+train_accuracy(O_model_multiple_12)
+test_accuracy(O_model_multiple_12)
+podaci_train <- podaci_train_pocetni
+cat("\nNakon undersampleinga:\n\n")
+podaci_train <- undersample_train
+cat("Jedan neuron, jedna epoha - \n")
+train_accuracy(U_model_one)
+test_accuracy(U_model_one)
+cat("\nJedan neuron, pet epoha - \n")
+train_accuracy(U_model_one_rep_5)
+test_accuracy(U_model_one_rep_5)
+cat("\nČetiri neurona, jedna epoha - \n")
+train_accuracy(U_model_multiple_4)
+test_accuracy(U_model_multiple_4)
+cat("\nDvanaest neurona, jedna epoha - \n")
+train_accuracy(U_model_multiple_12)
+test_accuracy(U_model_multiple_12)
+podaci_train <- podaci_train_pocetni
+```
+```{r}
+#ROC krive
+library(class)
+library(caret)
+library(pROC)
+
+
+
+rocF <- function(model, podaci_test){
+  library(neuralnet)
+  prob = compute(model, podaci_test[, -ncol(podaci_test)] )
+prob.result <- prob$net.result
+
+detach(package:neuralnet,unload = T)
+
+library(ROCR)
+nn.pred = prediction(prob.result, podaci_test$Churn)
+pref <- performance(nn.pred, "tpr", "fpr")
+plot(pref)
+}
+
+```
+```{r}
+rocF(model_one,podaci_test)
+rocF(model_one_rep_5,podaci_test)
+rocF(model_one_rep_7,podaci_test)
+rocF(model_multiple_4,podaci_test)
+rocF(model_multiple_8,podaci_test)
+rocF(model_multiple_12,podaci_test)
+rocF(model_multiple_4_rep_3,podaci_test)
+rocF(model_multiple_layers_3_1,podaci_test)
+rocF(model_multiple_layers_4_2,podaci_test)
+```
+```{r}
+rocF(O_model_one,podaci_test)
+rocF(O_model_one_rep_5,podaci_test)
+rocF(O_model_multiple_4,podaci_test)
+rocF(O_model_multiple_12,podaci_test)
+```
+
+```{r}
+rocF(U_model_one,podaci_test)
+rocF(U_model_one_rep_5,podaci_test)
+rocF(U_model_multiple_4,podaci_test)
+rocF(U_model_multiple_12,podaci_test)
+```
+
+## Zadatak 1. b)
+-   Tačnost veća od 0.75
+
+
+-   F1-mjera veća od 0.65
+
+-   Kappa statistika veća od 0.25
+
+-   Osjetljivost veća od 0.70
+
+-   Specifičnost veća od 0.75
+```{r}
+
+#Cetiri neurona, jedna epoha - Test accuracy: 0.8116343
+set.seed(5)
+#ucitavanje testnog skupa podataka
+podaci_train <- read.csv("customer_data_test.csv", fileEncoding = 'UTF-8')
+#faktorizacija kategorickih varijabli
+podaci_train$gender <- factor(podaci_train$gender)
+podaci_train$Dependents <- factor(podaci_train$Dependents)
+podaci_train$PhoneService <- factor(podaci_train$PhoneService)
+podaci_train$MultipleLines <- factor(podaci_train$MultipleLines)
+podaci_train$InternetService <- factor(podaci_train$InternetService)
+podaci_train$StreamingMovies <- factor(podaci_train$StreamingMovies)
+podaci_train$StreamingTV <- factor(podaci_train$StreamingTV)
+podaci_train$Contract <- factor(podaci_train$Contract)
+podaci_train$PaymentMethod <- factor(podaci_train$PaymentMethod)
+podaci_train$Churn <- factor(podaci_train$Churn)
+test_accuracy(model_multiple_4)
+test_accuracy(model_one_rep_7)
+test_accuracy(model_multiple_8)
+podaci_train <- podaci_train_pocetni
+```
+
+
+```{r}
+#save.image(file='myEnvironment.RData')
+#load('myEnvironment.RData')
+
+```
+
+

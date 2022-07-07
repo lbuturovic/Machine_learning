@@ -1,0 +1,159 @@
+---
+title: "Zadatak1b1c"
+output: html_document
+---
+
+## 1. b)
+
+Primijeniti PAM k-medoids algoritam nad prethodno pripremljenim setom podataka (pritom obrazložiti sve korake pripreme koji su izvršeni, kao i njihov utjecaj na efikasnost PAM algoritma). Odabrati metriku distance i optimalnu vrijednost broja klastera k s kojima se dobivaju najbolje performanse i obrazložiti njihov odabir. Evaluirati dobiveni model pomoću internih mjera validacije i objasniti dobivene rezultate. Ukoliko su dobiveni rezultati zadovoljavajući, obrazložiti zašto, a u suprotnom izvršiti određena poboljšanja.
+
+```{r}
+podaci <- read.csv("nakon_1a_scale.csv", fileEncoding = 'UTF-8')
+```
+
+```{r}
+library(cluster)
+model <- pam(podaci, k = 2)
+plot(podaci[c("Income", "TotalSpent")], col = model$cluster)
+plot(podaci[c("TotalSpent", "Kidhome")], col = model$cluster)
+library(factoextra)
+fviz_cluster(model, data = podaci, geom = "point")
+```
+
+```{r}
+fviz_nbclust(podaci, pam, method = "wss")
+```
+
+```{r}
+
+fviz_nbclust(podaci, pam, method = "silhouette")
+
+```
+
+```{r}
+fviz_nbclust(podaci, pam, method = "gap_stat", nboot = 2)
+```
+
+```{r}
+model <- pam(podaci, k = 4)
+fviz_cluster(model, data = podaci, geom = "point")
+```
+
+```{r}
+model <- pam(podaci, k = 7)
+fviz_cluster(model, data = podaci, geom = "point")
+```
+
+```{r}
+model <- pam(podaci, k = 10)
+fviz_cluster(model, data = podaci, geom = "point")
+```
+
+```{r}
+library(amap)
+modelManhattan <- pam(podaci, k = 2, metric = "manhattan")
+fviz_cluster(modelManhattan, data = podaci, geom = "point")
+
+```
+
+```{r}
+modelManhattan <- pam(podaci, k = 4, metric = "manhattan")
+fviz_cluster(modelManhattan, data = podaci, geom = "point")
+
+
+```
+
+```{r}
+modelManhattan <- pam(podaci, k = 7, metric = "manhattan")
+fviz_cluster(modelManhattan, data = podaci, geom = "point")
+```
+
+```{r}
+modelManhattan <- pam(podaci, k = 10, metric = "manhattan")
+fviz_cluster(modelManhattan, data = podaci, geom = "point")
+```
+
+```{r}
+
+```
+
+```{r}
+model <- pam(podaci, 2, metric = "euclidean")
+sil <- silhouette(model$cluster, get_dist(podaci, method =
+"euclidean"))
+cat("Srednja vrijednost silhouette metrike za PAM (euclidean metrika):",
+mean(sil[, 3]), "\n")
+fviz_silhouette(model)
+```
+
+```{r}
+model <- pam(podaci, 2, metric = "manhattan")
+sil <- silhouette(model$cluster, get_dist(podaci, method =
+"manhattan"))
+cat("Srednja vrijednost silhouette metrike za PAM (Manhattan metrika):",
+mean(sil[, 3]), "\n")
+fviz_silhouette(model)
+```
+
+
+## 1. c)
+
+```{r}
+library(cluster)
+library(factoextra)
+model_kmeans <- kmeans(podaci, centers = 2)
+plot(podaci[c("Income", "TotalSpent")], col = model_kmeans$cluster)
+plot(podaci[c("TotalSpent", "Kidhome")], col = model_kmeans$cluster)
+fviz_cluster(model_kmeans, data = podaci)
+```
+```{r}
+fviz_nbclust(podaci, kmeans, method = "wss")
+```
+
+```{r}
+fviz_nbclust(podaci, kmeans, method = "silhouette")
+```
+```{r}
+fviz_nbclust(podaci, kmeans, method = "gap_stat", nboot = 2)
+```
+```{r}
+library(clustertend)
+hopkins1 <- hopkins(podaci, n = 10)
+cat("Hopkins statistika za originalne podatke:", hopkins1$H, "\n")
+```
+
+```{r}
+distance <- get_dist(podaci, method = "manhattan")
+fviz_dist(distance, gradient = list(low = "blue", mid = "white", high ="red"))
+distance <- get_dist(podaci, method = "euclidean")
+fviz_dist(distance, gradient = list(low = "blue", mid = "white", high ="red"))
+distance <- get_dist(podaci, method = "minkowski")
+fviz_dist(distance, gradient = list(low = "blue", mid = "white", high ="red"))
+distance <- get_dist(podaci, method = "pearson")
+fviz_dist(distance, gradient = list(low = "blue", mid = "white", high ="red"))
+```
+```{r}
+model_kmeans <- Kmeans(podaci, centers = 5)
+fviz_cluster(model_kmeans, data = podaci)
+```
+```{r}
+model_kmeans <- Kmeans(podaci, centers = 7)
+fviz_cluster(model_kmeans, data = podaci)
+```
+```{r}
+model_kmeans <- Kmeans(podaci, centers = 9)
+fviz_cluster(model_kmeans, data = podaci)
+```
+```{r}
+library(amap)
+model <- Kmeans(podaci, centers = 2, method = "pearson")
+fviz_cluster(model, data = podaci)
+```
+```{r}
+model <- Kmeans(podaci, centers = 2, method = "manhattan")
+sil <- silhouette(model$cluster, get_dist(podaci, method = "manhattan"))
+cat("Srednja vrijednost silhouette metrike za kmeans:", mean(sil[, 3]),
+"\n")
+plot(sil, border = NA)
+```
+
